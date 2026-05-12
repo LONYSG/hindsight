@@ -1,0 +1,26 @@
+# 주가 데이터 수집
+yfinance==0.2.54
+
+# 거시지표 수집 (FRED API)
+fredapi==0.5.2
+
+# AI 뉴스 요약 (Gemini API)
+google-generativeai==0.8.5
+
+# PostgreSQL 드라이버
+psycopg2-binary==2.9.10
+
+# Elasticsearch 클라이언트
+elasticsearch==8.17.2
+
+# 환경변수 로딩 (.env 파일)
+python-dotenv==1.1.0
+
+# 데이터 처리
+pandas==2.2.3
+
+# Kafka 연동
+kafka-python==2.0.6
+
+# HTTP 요청 (GDELT 뉴스 수집)
+requests==2.32.3
