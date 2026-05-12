@@ -114,7 +114,7 @@ CREATE TABLE "user" (
 
 -- =====================================================
 -- 플레이 세션
--- 유저가 특정 시작점 + 기업을 선택해 게임 시작
+-- 유저가 특정 시작점 + 기업을 선택해 시뮬레이션 시작
 -- =====================================================
 CREATE TABLE play_session (
     id              BIGSERIAL PRIMARY KEY,
@@ -122,7 +122,7 @@ CREATE TABLE play_session (
     start_point_id  BIGINT         NOT NULL REFERENCES start_point(id),
     company_id      BIGINT         NOT NULL REFERENCES company(id),
     seed_money      NUMERIC(15, 4) NOT NULL,          -- 시드머니
-    current_date    DATE           NOT NULL,           -- 현재 게임 날짜
+    sim_date        DATE           NOT NULL,           -- 현재 시뮬레이션 날짜
     status          VARCHAR(20)    NOT NULL DEFAULT 'IN_PROGRESS',
     -- IN_PROGRESS: 진행 중
     -- COMPLETED: 완료
