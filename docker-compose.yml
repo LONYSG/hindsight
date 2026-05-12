@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+
+  # ==============================
+  # PostgreSQL - 주 데이터베이스
+  # ==============================
+  postgres:
+    image: postgres:15
+    container_name: hindsight-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hindsight}
+      POSTGRES_USER: ${POSTGRES_USER:-hindsight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hindsight}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - hindsight-net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hindsight}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==============================
+  # Redis - 세션 / 캐싱
+  # ==============================
+  redis:
+    image: redis:7-alpine
+    container_name: hindsight-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - hindsight-net
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==============================
+  # Zookeeper - Kafka 상태 관리
+  # ==============================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: hindsight-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - hindsight-net
+
+  # ==============================
+  # Kafka - 이벤트 브로커
+  # ==============================
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: hindsight-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # 로컬 PC에서 접속: localhost:9092
+      # Docker 내부 컨테이너에서 접속: kafka:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - hindsight-net
+
+  # ==============================
+  # Elasticsearch - 뉴스 저장 / 검색
+  # ==============================
+  elasticsearch:
+    image: elasticsearch:8.11.0
+    container_name: hindsight-elasticsearch
+    environment:
+      - discovery.type=single-node      # 로컬 단일 노드 모드
+      - xpack.security.enabled=false    # 로컬 개발용 보안 비활성화
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m  # 메모리 제한 (기본값이 너무 큼)
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - hindsight-net
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+# ==============================
+# 볼륨 - 컨테이너 재시작 후에도 데이터 유지
+# ==============================
+volumes:
+  postgres_data:
+  redis_data:
+  elasticsearch_data:
+
+# ==============================
+# 네트워크 - 컨테이너끼리 이름으로 통신
+# ==============================
+networks:
+  hindsight-net:
+    driver: bridge
