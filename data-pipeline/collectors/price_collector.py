@@ -5,7 +5,6 @@ import time
 import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
-from psycopg2.extras import execute_values
 from db.connection import get_connection
 
 # 기술적 지표 계산에 필요한 최소 이전 데이터 (일목균형표 52일 + 여유)
@@ -132,11 +131,10 @@ def _save_daily_price(conn, company_id: int, df: pd.DataFrame) -> int:
     ]
 
     with conn.cursor() as cur:
-        execute_values(
-            cur,
+        cur.executemany(
             """
             INSERT INTO daily_price (company_id, date, open, high, low, close, volume)
-            VALUES %s
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (company_id, date) DO NOTHING
             """,
             rows,
@@ -176,13 +174,12 @@ def _save_daily_indicator(conn, company_id: int, df: pd.DataFrame) -> int:
     ]
 
     with conn.cursor() as cur:
-        execute_values(
-            cur,
+        cur.executemany(
             """
             INSERT INTO daily_indicator
                 (company_id, date, rsi, macd, macd_signal, macd_histogram,
                  ichimoku_tenkan, ichimoku_kijun, ichimoku_senkou_a, ichimoku_senkou_b)
-            VALUES %s
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (company_id, date) DO NOTHING
             """,
             rows,

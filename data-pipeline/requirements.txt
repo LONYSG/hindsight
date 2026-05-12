@@ -7,8 +7,8 @@ fredapi==0.5.2
 # AI 뉴스 요약 (Gemini API)
 google-generativeai==0.8.5
 
-# PostgreSQL 드라이버
-psycopg2-binary==2.9.10
+# PostgreSQL 드라이버 (psycopg v3 - SCRAM-SHA-256 및 인코딩 안정성)
+psycopg[binary]==3.2.6
 
 # Elasticsearch 클라이언트
 elasticsearch==8.17.2
