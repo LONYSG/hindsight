@@ -1,5 +1,5 @@
-# 주가 데이터 수집
-yfinance==0.2.54
+# 주가 데이터 수집 (Stooq - 무료, API 키 불필요, 전체 기간 제공)
+requests==2.32.3
 
 # 거시지표 수집 (FRED API)
 fredapi==0.5.2
