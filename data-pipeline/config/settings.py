@@ -6,6 +6,9 @@ load_dotenv()
 # FRED API
 FRED_API_KEY = os.environ["FRED_API_KEY"]
 
+# Tiingo API (주가 데이터 - 무료, adjusted 포함, 전체 기간)
+TIINGO_API_KEY = os.environ["TIINGO_API_KEY"]
+
 # Gemini API
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
