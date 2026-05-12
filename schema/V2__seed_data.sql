@@ -6,7 +6,8 @@
 -- 기업 (MVP: AAPL 1개)
 -- =====================================================
 INSERT INTO company (ticker, name, exchange) VALUES
-    ('AAPL', 'Apple Inc.', 'NASDAQ');
+    ('AAPL', 'Apple Inc.', 'NASDAQ'),
+    ('NVDA', 'NVIDIA Corporation', 'NASDAQ');
 
 -- =====================================================
 -- 시작점
