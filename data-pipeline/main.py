@@ -5,6 +5,7 @@
 from datetime import date
 from collectors.price_collector import collect as collect_price
 from collectors.macro_collector import collect as collect_macro
+from processors.event_detector import detect as detect_events
 
 
 def main():
@@ -18,8 +19,10 @@ def main():
     # 거시지표 수집 (기준금리, 국채, 환율, S&P500, 나스닥)
     collect_macro(start_date="2019-10-01", end_date=today)
 
+    # 이벤트 감지 (PRICE_SPIKE, VOLUME_SPIKE)
+    detect_events(ticker="NVDA")
+
     # TODO: news_collector 실행
-    # TODO: event_detector 실행
 
 
 if __name__ == "__main__":
