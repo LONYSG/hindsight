@@ -1,0 +1,32 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/hindsight
+    username: hindsight
+    password: hindsight
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate          # Flyway가 스키마 관리 → JPA는 검증만
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  security:
+    user:
+      name: admin                 # 개발 중 임시 (나중에 제거)
+      password: admin
+
+server:
+  port: 8080
+
+jwt:
+  secret: hindsight-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256
+  expiration-ms: 86400000         # 24시간
+
+logging:
+  level:
+    com.hindsight: DEBUG
+    org.springframework.security: INFO
