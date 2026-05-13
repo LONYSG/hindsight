@@ -150,9 +150,118 @@ psycopg2로 DB 연결 시 `UnicodeDecodeError: 'utf-8' codec can't decode byte 0
 
 ---
 
+---
+
+## 2026-05-13
+
+### 9. 이벤트 감지기 구현
+
+**한 것:**
+`processors/event_detector.py` 작성. DB의 주가 데이터를 읽어 PRICE_SPIKE / VOLUME_SPIKE 이벤트를 감지하고 `market_event` 테이블에 저장.
+
+**감지 기준:**
+- PRICE_SPIKE: 전일 대비 종가 변동 ±3% 이상
+- VOLUME_SPIKE: 거래량이 20일 이동평균의 200% 이상
+
+**NVDA 결과:** PRICE_SPIKE 491건, VOLUME_SPIKE 29건 (총 520건)
+
+**왜 `collectors/`가 아닌 `processors/`에 넣었나:**
+외부 API를 호출하지 않고 이미 DB에 있는 데이터를 처리하는 역할이기 때문. 역할에 맞는 디렉토리를 쓰면 나중에 어느 파일을 고쳐야 할지 바로 찾을 수 있다.
+
+**멱등성 처리:**
+기존에 저장된 이벤트 목록을 메모리에 불러와 set으로 비교. 재실행해도 중복 저장 없음.
+
+**관련 PR:** #5
+
+---
+
+### 10. 뉴스 수집기 설계 - 험난한 여정
+
+**최종 결정:** Guardian API 단독 + Gemini 헤드라인 선별
+
+**왜 이렇게 됐나 - 시도한 방식들:**
+
+*1차: GDELT + BigQuery*
+전세계 뉴스 색인 서비스. BigQuery 공개 데이터셋으로 7년치 무료 접근 가능. 그런데 GDELT는 URL만 있고 기사 제목/본문이 없다. URL을 직접 스크래핑해야 하는데 7년된 기사는 404가 많아 포기.
+
+*2차: Guardian + NYT 조합*
+Guardian은 기사 전문 무료 제공, NYT는 초록 제공. 조합해서 쓰려 했는데 NYT API가 하루 단위 쿼리에서 자꾸 0건 반환, 섹션 필터도 작동 안 함. NYT 키워드 검색은 "nvidia"가 한 번만 언급돼도 포함돼서 무관한 기사가 대거 유입. 결국 NYT 제거.
+
+*3차: Guardian 단독 (섹션 기반)*
+Guardian `business` 섹션을 쓰면 될 줄 알았는데, Guardian이 영국 매체라 "Boohoo 보너스", "Paddy Power 벌금" 같은 영국 내수 기사가 섞였다. `production-office=us` 필터는 비즈니스 섹션에서 0건. 키워드 필터도 영국 기사가 같은 금융 용어를 써서 소용없었다.
+
+*4차: Gemini 헤드라인 선별 도입 (최종)*
+하루치 전체(최대 82건)를 수집한 뒤, 헤드라인만 Gemini에 보내서 "시장 영향 가능성"을 기준으로 선별. 영국 내수 기사 자동 제거, 개수도 유동적으로 결정.
+
+**최종 구조:**
+
+```
+[베이스 레이어] Guardian 3개 섹션, 하루씩 쿼리, page-size=200
+  business|money / technology / world|us-news|politics
+  → 82건 헤드라인 전체를 Gemini에 전달 → 시장 영향도 3점 이상만 저장
+
+[NVDA 레이어] Guardian nvidia 키워드, 월 단위 배치
+  → Gemini로 실제 NVDA 관련 여부 재확인 (false positive 제거)
+```
+
+**Gemini 선별 프롬프트 핵심:**
+"단순히 유명 뉴스를 고르는 게 아니라, 실제로 미국 증시(S&P500, Nasdaq), 주요 산업, 또는 글로벌 자금 흐름에 영향을 줄 가능성이 있는 뉴스만 선별"
+
+**비용:**
+Gemini 3.1 Flash Lite 무료 티어 활용. 3개월치 기준 토큰 사용량이 하루 무료 한도(100만 토큰) 이내.
+
+**수집 결과 (2020-02-01 ~ 2020-04-30):**
+
+| 카테고리 | 건수 |
+|---|---|
+| WORLD | 380건 |
+| BUSINESS | 173건 |
+| TECHNOLOGY | 32건 |
+| NVDA_DIRECT | 4건 |
+| **합계** | **589건** |
+
+NVDA_DIRECT가 4건인 건 정상. 2020년 초는 AI 붐 이전이라 NVIDIA 관련 뉴스가 드물었다.
+
+**관련 PR:** #5 (news_collector 포함)
+
+---
+
+### 11. Spring Boot 프로젝트 초기화
+
+**한 것:**
+Spring Boot 3.5.0 + Gradle 프로젝트 생성. JWT 인증 구현까지.
+
+**의존성 선택 이유:**
+- `spring-boot-starter-security` + `jjwt 0.12.6`: Stateless JWT 인증. 세션 없이 토큰으로 인증하는 표준 방식. REST API에 적합.
+- `spring-boot-starter-data-jpa`: DB 접근 추상화. SQL 직접 쓰는 것보다 유지보수가 쉽다.
+- `postgresql`: JDBC 드라이버.
+- `lombok`: 반복 코드(getter, constructor, builder) 제거.
+- `spring-boot-starter-validation`: 요청 파라미터 검증을 어노테이션으로 처리.
+
+**패키지 구조 설계:**
+```
+com.hindsight
+├── auth/        - 인증 (JWT, 회원가입/로그인)
+├── play/        - 플레이 세션
+├── trade/       - 매수/매도
+├── data/        - 주가/뉴스 데이터 조회
+├── result/      - 수익률/알파 계산
+└── global/      - 공통 설정, 예외 처리
+```
+
+도메인별로 controller/service/dto/entity/repository를 각각 패키지 안에 묶었다. 계층별(`controller/`, `service/`) 구조보다 도메인별 구조가 기능을 추가/수정할 때 관련 파일을 한 곳에서 찾을 수 있어 편하다.
+
+**`application.yml`에서 `ddl-auto: validate`를 쓴 이유:**
+`create`나 `update`를 쓰면 JPA가 스키마를 자동으로 바꿔버린다. Flyway로 이미 스키마를 정밀하게 설계했는데 JPA가 멋대로 바꾸면 충돌이 생긴다. `validate`는 엔티티와 DB 스키마가 일치하는지 확인만 하고 건드리지 않는다.
+
+**관련 PR:** #6
+
+---
+
 ## 다음에 할 것
 
-- [ ] `event_detector.py` - 주가 ±3% 급변 / 거래량 급증 이벤트 감지
-- [ ] `news_collector.py` - 뉴스 수집 + Gemini 요약 → Elasticsearch 저장
-- [ ] FRED API 거시경제 이벤트 캘린더 (FOMC, CPI 발표일)
-- [ ] Spring Boot 프로젝트 초기화 (Phase 2)
+- [ ] `summarize_pending()` 실행 → 뉴스 496건 Gemini 요약 채우기
+- [ ] `./gradlew bootRun` → Spring Boot 서버 실행 확인
+- [ ] 플레이 세션 API 구현 (시작/진행/종료)
+- [ ] 매수/매도 API 구현
+- [ ] FOMC, CPI 캘린더 이벤트 수집 (market_event 테이블)
