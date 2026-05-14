@@ -1,0 +1,10 @@
+import client from './client'
+
+export const startSession = (startPointId, companyId, seedMoney) =>
+  client.post('/play/sessions', { startPointId, companyId, seedMoney })
+
+export const getState = (sessionId) =>
+  client.get(`/play/sessions/${sessionId}/state`)
+
+export const nextDay = (sessionId, jumpType) =>
+  client.post(`/play/sessions/${sessionId}/next`, { jumpType })

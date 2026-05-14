@@ -32,6 +32,7 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/data/**").permitAll()  // 시작점/기업 목록은 공개
                 .anyRequest().authenticated()
             )
             .addFilterBefore(
