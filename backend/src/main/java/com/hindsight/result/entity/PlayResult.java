@@ -21,10 +21,18 @@ public class PlayResult {
     @JoinColumn(name = "session_id", nullable = false)
     private PlaySession session;
 
+    @Column(name = "my_return")
     private BigDecimal myReturn;
+
+    @Column(name = "stock_return")
     private BigDecimal stockReturn;
+
+    @Column(name = "nasdaq_return")
     private BigDecimal nasdaqReturn;
+
+    @Column(name = "sp500_return")
     private BigDecimal sp500Return;
+
     private BigDecimal alpha;
 
     @Column(nullable = false, updatable = false)
