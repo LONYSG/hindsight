@@ -29,7 +29,7 @@ export default function SetupPage() {
     setError('')
     try {
       const res = await startSession(selectedStartPoint.id, selectedCompany.id, seedMoney)
-      navigate(`/play/${res.data.sessionId}`, { state: { initialState: res.data } })
+      navigate(`/play/${res.data.sessionId}`, { state: { initialState: res.data, startDate: selectedStartPoint.startDate, companyId: selectedCompany.id } })
     } catch (err) {
       setError(err.response?.data?.message || '오류가 발생했습니다.')
       setLoading(false)
@@ -103,18 +103,18 @@ export default function SetupPage() {
 const styles = {
   container: { minHeight: '100vh', background: '#0f0f0f', padding: '32px 16px' },
   inner: { maxWidth: 720, margin: '0 auto' },
-  title: { color: '#fff', fontSize: 22, marginBottom: 28 },
-  section: { marginBottom: 28 },
-  label: { color: '#aaa', fontSize: 12, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 },
-  cardGrid: { display: 'flex', gap: 10, flexWrap: 'wrap' },
-  card: { background: '#1a1a1a', border: '1px solid #333', borderRadius: 10, padding: '14px 16px', cursor: 'pointer', flex: '1 1 140px' },
-  cardActive: { background: '#1a1a1a', border: '2px solid #4ade80', borderRadius: 10, padding: '14px 16px', cursor: 'pointer', flex: '1 1 140px' },
-  cardTitle: { color: '#fff', fontWeight: 700, fontSize: 15, marginBottom: 6 },
-  cardDesc: { color: '#888', fontSize: 12, marginBottom: 8, lineHeight: 1.5 },
-  cardDate: { color: '#4ade80', fontSize: 12 },
+  title: { color: '#e8e8e8', fontSize: 20, fontWeight: 600, marginBottom: 24, letterSpacing: '-0.3px' },
+  section: { marginBottom: 24 },
+  label: { color: '#666', fontSize: 11, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 },
+  cardGrid: { display: 'flex', gap: 8, flexWrap: 'wrap' },
+  card: { background: '#161616', border: '1px solid #252525', borderRadius: 10, padding: '14px', cursor: 'pointer', flex: '1 1 140px' },
+  cardActive: { background: '#161616', border: '2px solid #4ade80', borderRadius: 10, padding: '14px', cursor: 'pointer', flex: '1 1 140px' },
+  cardTitle: { color: '#e8e8e8', fontWeight: 600, fontSize: 14, marginBottom: 5 },
+  cardDesc: { color: '#777', fontSize: 11, marginBottom: 8, lineHeight: 1.5 },
+  cardDate: { color: '#4ade80', fontSize: 11 },
   seedRow: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  seed: { background: '#1a1a1a', border: '1px solid #333', borderRadius: 8, padding: '10px 14px', color: '#aaa', cursor: 'pointer', fontSize: 13, flex: '1 1 80px' },
-  seedActive: { background: '#1a1a1a', border: '2px solid #4ade80', borderRadius: 8, padding: '10px 14px', color: '#4ade80', cursor: 'pointer', fontSize: 13, fontWeight: 600, flex: '1 1 80px' },
+  seed: { background: '#161616', border: '1px solid #252525', borderRadius: 8, padding: '10px 14px', color: '#888', cursor: 'pointer', fontSize: 13, flex: '1 1 80px' },
+  seedActive: { background: '#161616', border: '2px solid #4ade80', borderRadius: 8, padding: '10px 14px', color: '#4ade80', cursor: 'pointer', fontSize: 13, fontWeight: 600, flex: '1 1 80px' },
   error: { color: '#f87171', fontSize: 13 },
-  startBtn: { width: '100%', background: '#4ade80', color: '#000', border: 'none', borderRadius: 10, padding: '14px 0', fontSize: 16, fontWeight: 700, cursor: 'pointer', marginTop: 8 },
+  startBtn: { width: '100%', background: '#4ade80', color: '#000', border: 'none', borderRadius: 10, padding: '14px 0', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginTop: 8 },
 }

@@ -4,6 +4,7 @@ import com.hindsight.data.entity.DailyPrice;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 public interface DailyPriceRepository extends JpaRepository<DailyPrice, Long> {
@@ -15,4 +16,7 @@ public interface DailyPriceRepository extends JpaRepository<DailyPrice, Long> {
 
     // 해당 날짜 이전 마지막 거래일 (전일 종가 계산용)
     Optional<DailyPrice> findFirstByCompanyIdAndDateLessThanOrderByDateDesc(Long companyId, LocalDate date);
+
+    // 차트용: 날짜 범위 조회
+    List<DailyPrice> findByCompanyIdAndDateBetweenOrderByDateAsc(Long companyId, LocalDate from, LocalDate to);
 }

@@ -62,4 +62,13 @@ public class PlaySession {
         this.simDate = newDate;
         this.updatedAt = LocalDateTime.now();
     }
+
+    public void finish() {
+        this.status = "FINISHED";
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public boolean isFinished() {
+        return "FINISHED".equals(this.status);
+    }
 }

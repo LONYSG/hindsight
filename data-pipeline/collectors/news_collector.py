@@ -35,72 +35,85 @@ _BASE_SECTIONS = [
 ]
 
 _SELECTION_PROMPT = """\
-당신은 미국 주식시장 전문 매크로/섹터 뉴스 필터 AI입니다.
+당신은 미국 주식 투자자를 위한 금융 뉴스 필터 시스템입니다.
 
-목표는 단순히 유명 뉴스를 고르는 것이 아니라,
-실제로 미국 증시(S&P500, Nasdaq), 주요 산업,
-또는 글로벌 자금 흐름에 영향을 줄 가능성이 있는 뉴스만 선별하는 것입니다.
+아래는 {date} 하루 동안 수집된 뉴스 헤드라인 목록입니다.
 
-헤드라인의 화제성보다 "시장 영향 가능성"을 우선 평가하세요.
+목표는 단순히 가장 큰 뉴스만 고르는 것이 아니라,
+당시 미국 주식 투자자가 투자 판단에 참고할 가능성이 있는 뉴스들을 선별하는 것입니다.
 
-아래는 {date} 하루치 뉴스 헤드라인 전체 목록입니다.
+현재 시장 반응이 크지 않았더라도,
+기업 성장성, 산업 변화, 기술 변화, 거시경제 흐름,
+또는 투자 심리에 영향을 줄 가능성이 있다면 포함할 수 있습니다.
 
-[중요 뉴스 판단 기준]
+특히 당시에는 중요도가 낮아 보였더라도,
+이후 산업 변화나 시장 흐름 측면에서 의미가 있었을 가능성이 있는 뉴스는 포함할 수 있습니다.
 
-다음 요소 중 하나라도 강하게 해당하면 중요 뉴스로 판단하세요:
+단, 억지 해석이나 결과론적 과대평가는 피하고,
+실제 투자자가 참고할 가치가 있는 정보인지 기준으로 판단하세요.
 
-- 미국 증시 주요 지수 변동 가능성
-- 미국 국채금리 / 달러 / 유가 / 환율 영향
-- 연준(Fed), 금리, CPI, 고용, GDP 등 거시경제 영향
-- 글로벌 유동성 변화 가능성
-- AI / 반도체 / 클라우드 / 방산 / 에너지 / 바이오 등 핵심 섹터 영향
-- 시가총액 상위 기업 실적 또는 가이던스 영향
-- 공급망, 관세, 제재, 규제 영향
-- 지정학 리스크 및 글로벌 투자심리 변화
-- 글로벌 자금 흐름(risk-on / risk-off) 변화 가능성
+[포함 기준]
+
+다음과 관련된 뉴스는 우선적으로 포함하세요:
+
+* 미국 증시(S&P500, Nasdaq) 관련 이슈
+* 미국 및 글로벌 거시경제 (Fed, 금리, CPI, 고용, GDP, 국채금리, 환율, 유동성 등)
+* 주요 기업 뉴스 (실적, 가이던스, 제품 출시, 공급망, 계약, 투자, 구조조정, CEO 발언 등)
+* 기술 및 산업 변화 (AI, 반도체, 클라우드, 전기차, 에너지, 바이오, 로봇, 방산, 우주 등)
+* 글로벌 지정학 및 정책 변화 (중국, 대만, 중동, 러시아, 관세, 제재, 수출규제 등)
+* 시장 심리에 영향을 줄 수 있는 이벤트
+* 장기적으로 중요해질 가능성이 있는 산업/기술 변화
+* 당시 투자자들이 관심 있게 볼 가능성이 있는 뉴스
 
 미국 뉴스가 아니더라도,
-미국 시장에 실질적 파급효과가 예상되면 포함하세요.
-
-예:
-- 일본 금리 정책
-- 중국 경기 부양책
-- OPEC 정책
-- 중동/대만 지정학
-- 유럽 규제
-- 글로벌 반도체 공급망 이슈
+미국 기업·산업·시장에 영향을 줄 가능성이 있다면 포함하세요.
 
 [제외 기준]
 
 다음 유형은 제외하세요:
 
-- 미국 금융시장과 연결성이 약한 지역 로컬 뉴스
-- 영국/유럽 지역 내수 위주 뉴스
-- 스포츠/연예/문화 뉴스
-- 단순 사건사고
-- 클릭 유도형 기사
-- 투자 판단에 실질 도움이 없는 정치 공방
-- 유명 기업이라도 시장 영향성이 낮은 단발성 이슈
+* 미국 투자자와 관련성이 낮은 지역 로컬 뉴스
+* 영국/유럽 지역 내수 위주 뉴스
+* 스포츠, 연예, 문화 뉴스
+* 일반 사건사고 및 범죄 뉴스
+* 투자 판단과 관련성이 낮은 정치 공방
+* 지나치게 지역적인 사회 이슈
+* 시장 및 산업 영향이 거의 없는 단순 화제성 기사
 
-[중요도 평가]
+[중요도 점수 기준]
 
-각 뉴스의 시장 영향도를 0~5로 평가하세요.
+각 뉴스에 대해 당시 기준 투자 중요도를 1~5점으로 평가하세요.
+기준은 "당시 투자자가 일반적으로 얼마나 중요하게 받아들였을 가능성이 있는가"입니다.
 
-5 = 미국 증시 전체에 큰 영향 가능
-4 = 핵심 섹터에 큰 영향
-3 = 주요 기업/산업에 의미 있는 영향
-2 이하 = 일반적으로 제외
+5 = 시장 전체 또는 핵심 산업에 매우 큰 영향을 주는 이벤트
+4 = 주요 기업/산업 흐름에 중요한 뉴스
+3 = 투자자가 참고할 가치가 높은 뉴스
+2 = 약한 관련성이 있지만 일부 투자자에겐 의미 있을 수 있는 뉴스
+1 = 관련성은 있으나 중요도가 매우 낮은 뉴스
 
-동일 사건은 가장 포괄적인 기사 1개만 선택하세요.
+[선별 원칙]
 
-최종적으로 중요도 3 이상 뉴스만 선택하세요.
+* 너무 엄격하게 필터링하지 마세요.
+* 중요한 뉴스를 놓치는 것보다 약간 더 넓게 포함하는 것을 우선하세요.
+* 동일 사건은 가장 포괄적인 기사 1개만 선택하세요.
+* 헤드라인의 자극성보다 실제 정보 가치를 우선 평가하세요.
+* "당시 투자자가 참고할 만했는가"를 가장 중요하게 판단하세요.
 
 헤드라인 목록:
 {headlines}
 
-응답 형식:
-선택한 번호만 쉼표로 구분하여 출력
-예시: 3,7,12,18"""
+응답 형식 (반드시 준수):
+선택한 기사 번호와 중요도를 한 줄씩, 파이프(|)로 구분하여 출력하세요.
+중요도 2점 이상인 기사만 포함하세요.
+
+예시:
+3|5
+7|4
+12|3
+18|2"""
+
+# 선별 최소 중요도 (이 이상인 기사만 저장)
+_SELECTION_MIN_SCORE = 2
 
 _NVDA_SELECTION_PROMPT = """\
 당신은 NVIDIA 주식 투자자를 위한 뉴스 필터 AI입니다.
@@ -129,23 +142,70 @@ _NVDA_SELECTION_PROMPT = """\
 # 무료 티어: 분당 15회 호출 → 호출 간 최소 4초
 _GEMINI_FREE_TIER_SLEEP = 4.5
 
-_SUMMARY_PROMPT = """\
-당신은 주식 투자자를 위한 뉴스 요약 전문가입니다.
-아래 뉴스 기사를 읽고, 주식 투자자 관점에서 한국어로 5~6문장으로 요약해주세요.
+_TITLE_KO_PROMPT = """\
+당신은 글로벌 금융 뉴스 헤드라인 전문 번역 시스템입니다.
 
-요약에 반드시 포함할 것:
-1. 무슨 일이 있었는지 (핵심 사실)
-2. 왜 중요한지 (시장/산업 맥락)
-3. 수치가 있으면 포함 (주가, 시총, %, 금리 등)
-4. 반도체·AI·NVIDIA 관련 투자 시사점 (해당되는 경우)
-5. 리스크 또는 불확실성 요인 (있는 경우)
+입력된 영어 뉴스 헤드라인을
+한국 경제뉴스 스타일의 자연스러운 한국어 제목으로 번역하세요.
+
+출력 규칙:
+- 번역된 헤드라인만 출력
+- 설명, 부연, 따옴표, 괄호 설명 추가 금지
+- "번역:" 같은 표현 금지
+- markdown 사용 금지
+- 한 줄로 출력
+
+번역 규칙:
+- 원문의 핵심 의미 유지
+- 과장되거나 감정적인 표현 금지
+- 클릭 유도형 표현 제거
+- 한국 경제뉴스에서 실제 사용할 법한 자연스러운 문장으로 작성
+- 직역투 표현 금지
+- 기업명, 기관명, 국가명은 일반적으로 알려진 한국어 표기 사용
+- ticker symbol이나 고유명사는 필요 시 유지
+- 숫자, 비율, 금액, 금리 정보는 가능하면 유지
+- 의미가 불분명해지지 않는 범위 내에서 간결하게 작성
+- 투자자가 빠르게 핵심을 이해할 수 있게 작성
+
+헤드라인: {title}"""
+
+_SUMMARY_PROMPT = """\
+당신은 글로벌 뉴스 전문 번역 및 요약 시스템입니다.
+
+입력된 영어 뉴스 기사를 읽고,
+핵심 정보만 한국어로 자연스럽고 가독성 좋게 요약하세요.
+
+출력 형식 규칙:
+- 오직 요약 본문만 출력
+- 다른 문장은 절대 추가하지 말 것
+- "다음은 요약입니다", "요약:", "핵심 내용:" 같은 표현 금지
+- 제목 생성 금지
+- 번호 목록 및 불릿 포인트 금지
+- markdown 사용 금지
+- 일반 문단 형태로만 작성
+- 가독성을 위해 의미 단위로 자연스럽게 줄바꿈 사용 가능
+- 문맥이 전환되면 새 줄로 구분 가능
+- 단, 목록 형태처럼 작성하지 말 것
+- 지나치게 긴 한 문단은 피할 것
+
+작성 규칙:
+- 기사 내용이 짧으면 짧게, 중요 정보가 많으면 더 자세히 작성
+- 억지로 분량을 맞추지 말 것
+- 핵심 정보 밀도를 우선할 것
+- 무엇이 발생했는지 명확하게 설명
+- 중요한 기업, 인물, 기관, 국가명 유지
+- 핵심 수치와 데이터는 가능하면 포함
+- 시장 또는 산업 맥락이 중요하면 간략히 포함
+- 향후 변수나 리스크가 중요하면 포함
+- 원문의 의미를 왜곡하지 말 것
+- 한국인이 읽기에 자연스러운 문장으로 번역할 것
+- 직역투 표현 금지
+- 세부 설명보다 핵심 사실 전달을 우선할 것
 
 날짜: {date}
 출처: {source}
 제목: {title}
-내용: {body}
-
-요약:"""
+내용: {body}"""
 
 
 class RateLimitError(Exception):
@@ -221,13 +281,65 @@ def summarize_pending(batch_size: int = 50):
         if not hits:
             break
         for hit in hits:
-            summary = _summarize(model, hit["_source"])
-            es.update(index=_ES_INDEX, id=hit["_id"], body={"doc": {"summary": summary}})
+            title_ko, summary = _summarize(model, hit["_source"])
+            es.update(index=_ES_INDEX, id=hit["_id"], body={"doc": {"title_ko": title_ko, "summary": summary}})
             total += 1
             time.sleep(_GEMINI_FREE_TIER_SLEEP)
         print(f"[summarize_pending] {total}건 완료...")
 
     print(f"[summarize_pending] 완료. 총 {total}건")
+
+
+def reset_index():
+    """
+    ES 인덱스 초기화 (재수집 전 실행).
+    기존 데이터 전체 삭제 후 새 매핑으로 재생성.
+    """
+    es = _get_es_client()
+    if es.indices.exists(index=_ES_INDEX):
+        es.indices.delete(index=_ES_INDEX)
+        print(f"[reset_index] '{_ES_INDEX}' 인덱스 삭제 완료")
+    _ensure_index(es)
+    print(f"[reset_index] '{_ES_INDEX}' 인덱스 재생성 완료 (importance 필드 포함)")
+
+
+def re_summarize_all(batch_size: int = 50):
+    """
+    프롬프트 개선 후 전체 재요약.
+    기존 summary/title_ko 를 새 프롬프트로 덮어쓴다.
+    하루 500회 무료 쿼터 → 약 500건/일 처리 가능.
+    """
+    es = _get_es_client()
+    genai.configure(api_key=settings.GEMINI_API_KEY)
+    model = genai.GenerativeModel(settings.GEMINI_MODEL)
+
+    total = 0
+    page = 0
+    while True:
+        resp = es.search(
+            index=_ES_INDEX,
+            query={"match_all": {}},
+            _source=["title", "date", "source", "body"],
+            size=batch_size,
+            from_=page * batch_size,
+            sort=[{"date": "asc"}],
+        )
+        hits = resp["hits"]["hits"]
+        if not hits:
+            break
+        for hit in hits:
+            src = hit["_source"]
+            if not src.get("body"):
+                continue
+            title_ko, summary = _summarize(model, src)
+            es.update(index=_ES_INDEX, id=hit["_id"], body={"doc": {"title_ko": title_ko, "summary": summary}})
+            total += 1
+            time.sleep(_GEMINI_FREE_TIER_SLEEP)
+        page += 1
+        print(f"[re_summarize_all] {total}건 완료...")
+
+    print(f"[re_summarize_all] 전체 완료. 총 {total}건")
+    print_token_stats()
 
 
 # ─── 베이스 레이어 ────────────────────────────────────────────
@@ -264,7 +376,9 @@ def _collect_base(es: Elasticsearch, start_date: str, end_date: str, model, summ
 
         if summarize:
             for a in new_articles:
-                a["summary"] = _summarize(model, a)
+                title_ko, summary = _summarize(model, a)
+                a["title_ko"] = title_ko
+                a["summary"]  = summary
                 time.sleep(_GEMINI_FREE_TIER_SLEEP)  # 무료 티어: 15RPM
 
         saved = _bulk_save(es, new_articles)
@@ -304,7 +418,11 @@ def _fetch_guardian_day(day: str, section: str, category: str) -> list[dict]:
 
 
 def _select_with_gemini(model, articles: list[dict], day: str) -> list[dict]:
-    """전체 헤드라인을 Gemini에 전달해 시장 영향도 3점 이상 기사만 선별."""
+    """
+    전체 헤드라인을 Gemini에 전달해 선별 + 중요도 점수 부여.
+    응답 형식: 번호|중요도 (한 줄씩)
+    _SELECTION_MIN_SCORE 이상인 기사만 반환하며, importance 필드를 추가한다.
+    """
     if not articles:
         return []
 
@@ -317,17 +435,35 @@ def _select_with_gemini(model, articles: list[dict], day: str) -> list[dict]:
     try:
         result = model.generate_content(prompt)
         _log_tokens(result.usage_metadata)
-        raw = result.text.strip().replace("\n", ",")
-        indices = [
-            int(x.strip()) - 1
-            for x in raw.split(",")
-            if x.strip().isdigit()
-        ]
-        selected = [articles[i] for i in indices if 0 <= i < len(articles)]
-        return selected if selected else articles[:5]  # 선별 실패 시 상위 5건 fallback
+
+        selected = []
+        for line in result.text.strip().split("\n"):
+            line = line.strip()
+            if "|" not in line:
+                continue
+            parts = line.split("|")
+            if len(parts) != 2:
+                continue
+            num_str, score_str = parts[0].strip(), parts[1].strip()
+            if not num_str.isdigit() or not score_str.isdigit():
+                continue
+            idx   = int(num_str) - 1
+            score = int(score_str)
+            if 0 <= idx < len(articles) and score >= _SELECTION_MIN_SCORE:
+                article = articles[idx].copy()
+                article["importance"] = score
+                selected.append(article)
+
+        if not selected:
+            print(f"  [{day}] 선별 결과 없음 (fallback: 상위 3건, importance=2)")
+            fallback = [dict(a, importance=2) for a in articles[:3]]
+            return fallback
+
+        return selected
+
     except Exception as e:
         print(f"  Gemini 선별 오류 ({day}): {e}")
-        return articles[:5]
+        return [dict(a, importance=2) for a in articles[:3]]
 
 
 def _select_nvda_with_gemini(model, articles: list[dict], month: str) -> list[dict]:
@@ -366,7 +502,9 @@ def _collect_nvda(es: Elasticsearch, start_date: str, end_date: str, model):
 
         if model:
             for a in new_articles:
-                a["summary"] = _summarize(model, a)
+                title_ko, summary = _summarize(model, a)
+                a["title_ko"] = title_ko
+                a["summary"]  = summary
                 time.sleep(_GEMINI_FREE_TIER_SLEEP)  # 무료 티어: 15RPM
 
         saved = _bulk_save(es, new_articles)
@@ -405,13 +543,37 @@ def _fetch_guardian_nvda(from_date: str, to_date: str) -> list[dict]:
 
 # ─── Gemini 요약 ──────────────────────────────────────────────
 
-def _summarize(model, article: dict) -> str:
+def _summarize(model, article: dict) -> tuple[str, str]:
+    """
+    (title_ko, summary) 튜플 반환.
+    헤드라인 번역과 본문 요약을 각각 별도 호출로 처리.
+    """
+    title_ko = _translate_title(model, article.get("title", ""))
+    time.sleep(_GEMINI_FREE_TIER_SLEEP)
+    summary  = _summarize_body(model, article)
+    return title_ko, summary
+
+
+def _translate_title(model, title: str) -> str:
+    if not title:
+        return ""
+    prompt = _TITLE_KO_PROMPT.format(title=title)
+    try:
+        result = model.generate_content(prompt)
+        _log_tokens(result.usage_metadata)
+        return result.text.strip()
+    except Exception as e:
+        print(f"  제목 번역 오류 ({title[:40]}): {e}")
+        return ""
+
+
+def _summarize_body(model, article: dict) -> str:
     if not article.get("body"):
         return ""
     prompt = _SUMMARY_PROMPT.format(
-        date=article["date"],
-        source=article["source"],
-        title=article["title"],
+        date=article.get("date", ""),
+        source=article.get("source", ""),
+        title=article.get("title", ""),
         body=article["body"],
     )
     try:
@@ -419,7 +581,7 @@ def _summarize(model, article: dict) -> str:
         _log_tokens(result.usage_metadata)
         return result.text.strip()
     except Exception as e:
-        print(f"  Gemini 요약 오류 ({article['title'][:40]}): {e}")
+        print(f"  본문 요약 오류 ({article.get('title','')[:40]}): {e}")
         return ""
 
 
@@ -458,9 +620,11 @@ def _ensure_index(es: Elasticsearch):
                     "category":     {"type": "keyword"},
                     "source":       {"type": "keyword"},
                     "title":        {"type": "text", "analyzer": "english"},
+                    "title_ko":     {"type": "text"},
                     "url":          {"type": "keyword"},
                     "body":         {"type": "text", "analyzer": "english"},
                     "summary":      {"type": "text"},
+                    "importance":   {"type": "integer"},  # 당시 투자자 중요도 (1~5)
                 }
             }
         },
