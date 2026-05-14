@@ -35,72 +35,85 @@ _BASE_SECTIONS = [
 ]
 
 _SELECTION_PROMPT = """\
-당신은 미국 주식시장 전문 매크로/섹터 뉴스 필터 AI입니다.
+당신은 미국 주식 투자자를 위한 금융 뉴스 필터 시스템입니다.
 
-목표는 단순히 유명 뉴스를 고르는 것이 아니라,
-실제로 미국 증시(S&P500, Nasdaq), 주요 산업,
-또는 글로벌 자금 흐름에 영향을 줄 가능성이 있는 뉴스만 선별하는 것입니다.
+아래는 {date} 하루 동안 수집된 뉴스 헤드라인 목록입니다.
 
-헤드라인의 화제성보다 "시장 영향 가능성"을 우선 평가하세요.
+목표는 단순히 가장 큰 뉴스만 고르는 것이 아니라,
+당시 미국 주식 투자자가 투자 판단에 참고할 가능성이 있는 뉴스들을 선별하는 것입니다.
 
-아래는 {date} 하루치 뉴스 헤드라인 전체 목록입니다.
+현재 시장 반응이 크지 않았더라도,
+기업 성장성, 산업 변화, 기술 변화, 거시경제 흐름,
+또는 투자 심리에 영향을 줄 가능성이 있다면 포함할 수 있습니다.
 
-[중요 뉴스 판단 기준]
+특히 당시에는 중요도가 낮아 보였더라도,
+이후 산업 변화나 시장 흐름 측면에서 의미가 있었을 가능성이 있는 뉴스는 포함할 수 있습니다.
 
-다음 요소 중 하나라도 강하게 해당하면 중요 뉴스로 판단하세요:
+단, 억지 해석이나 결과론적 과대평가는 피하고,
+실제 투자자가 참고할 가치가 있는 정보인지 기준으로 판단하세요.
 
-- 미국 증시 주요 지수 변동 가능성
-- 미국 국채금리 / 달러 / 유가 / 환율 영향
-- 연준(Fed), 금리, CPI, 고용, GDP 등 거시경제 영향
-- 글로벌 유동성 변화 가능성
-- AI / 반도체 / 클라우드 / 방산 / 에너지 / 바이오 등 핵심 섹터 영향
-- 시가총액 상위 기업 실적 또는 가이던스 영향
-- 공급망, 관세, 제재, 규제 영향
-- 지정학 리스크 및 글로벌 투자심리 변화
-- 글로벌 자금 흐름(risk-on / risk-off) 변화 가능성
+[포함 기준]
+
+다음과 관련된 뉴스는 우선적으로 포함하세요:
+
+* 미국 증시(S&P500, Nasdaq) 관련 이슈
+* 미국 및 글로벌 거시경제 (Fed, 금리, CPI, 고용, GDP, 국채금리, 환율, 유동성 등)
+* 주요 기업 뉴스 (실적, 가이던스, 제품 출시, 공급망, 계약, 투자, 구조조정, CEO 발언 등)
+* 기술 및 산업 변화 (AI, 반도체, 클라우드, 전기차, 에너지, 바이오, 로봇, 방산, 우주 등)
+* 글로벌 지정학 및 정책 변화 (중국, 대만, 중동, 러시아, 관세, 제재, 수출규제 등)
+* 시장 심리에 영향을 줄 수 있는 이벤트
+* 장기적으로 중요해질 가능성이 있는 산업/기술 변화
+* 당시 투자자들이 관심 있게 볼 가능성이 있는 뉴스
 
 미국 뉴스가 아니더라도,
-미국 시장에 실질적 파급효과가 예상되면 포함하세요.
-
-예:
-- 일본 금리 정책
-- 중국 경기 부양책
-- OPEC 정책
-- 중동/대만 지정학
-- 유럽 규제
-- 글로벌 반도체 공급망 이슈
+미국 기업·산업·시장에 영향을 줄 가능성이 있다면 포함하세요.
 
 [제외 기준]
 
 다음 유형은 제외하세요:
 
-- 미국 금융시장과 연결성이 약한 지역 로컬 뉴스
-- 영국/유럽 지역 내수 위주 뉴스
-- 스포츠/연예/문화 뉴스
-- 단순 사건사고
-- 클릭 유도형 기사
-- 투자 판단에 실질 도움이 없는 정치 공방
-- 유명 기업이라도 시장 영향성이 낮은 단발성 이슈
+* 미국 투자자와 관련성이 낮은 지역 로컬 뉴스
+* 영국/유럽 지역 내수 위주 뉴스
+* 스포츠, 연예, 문화 뉴스
+* 일반 사건사고 및 범죄 뉴스
+* 투자 판단과 관련성이 낮은 정치 공방
+* 지나치게 지역적인 사회 이슈
+* 시장 및 산업 영향이 거의 없는 단순 화제성 기사
 
-[중요도 평가]
+[중요도 점수 기준]
 
-각 뉴스의 시장 영향도를 0~5로 평가하세요.
+각 뉴스에 대해 당시 기준 투자 중요도를 1~5점으로 평가하세요.
+기준은 "당시 투자자가 일반적으로 얼마나 중요하게 받아들였을 가능성이 있는가"입니다.
 
-5 = 미국 증시 전체에 큰 영향 가능
-4 = 핵심 섹터에 큰 영향
-3 = 주요 기업/산업에 의미 있는 영향
-2 이하 = 일반적으로 제외
+5 = 시장 전체 또는 핵심 산업에 매우 큰 영향을 주는 이벤트
+4 = 주요 기업/산업 흐름에 중요한 뉴스
+3 = 투자자가 참고할 가치가 높은 뉴스
+2 = 약한 관련성이 있지만 일부 투자자에겐 의미 있을 수 있는 뉴스
+1 = 관련성은 있으나 중요도가 매우 낮은 뉴스
 
-동일 사건은 가장 포괄적인 기사 1개만 선택하세요.
+[선별 원칙]
 
-최종적으로 중요도 3 이상 뉴스만 선택하세요.
+* 너무 엄격하게 필터링하지 마세요.
+* 중요한 뉴스를 놓치는 것보다 약간 더 넓게 포함하는 것을 우선하세요.
+* 동일 사건은 가장 포괄적인 기사 1개만 선택하세요.
+* 헤드라인의 자극성보다 실제 정보 가치를 우선 평가하세요.
+* "당시 투자자가 참고할 만했는가"를 가장 중요하게 판단하세요.
 
 헤드라인 목록:
 {headlines}
 
-응답 형식:
-선택한 번호만 쉼표로 구분하여 출력
-예시: 3,7,12,18"""
+응답 형식 (반드시 준수):
+선택한 기사 번호와 중요도를 한 줄씩, 파이프(|)로 구분하여 출력하세요.
+중요도 2점 이상인 기사만 포함하세요.
+
+예시:
+3|5
+7|4
+12|3
+18|2"""
+
+# 선별 최소 중요도 (이 이상인 기사만 저장)
+_SELECTION_MIN_SCORE = 2
 
 _NVDA_SELECTION_PROMPT = """\
 당신은 NVIDIA 주식 투자자를 위한 뉴스 필터 AI입니다.
@@ -392,7 +405,11 @@ def _fetch_guardian_day(day: str, section: str, category: str) -> list[dict]:
 
 
 def _select_with_gemini(model, articles: list[dict], day: str) -> list[dict]:
-    """전체 헤드라인을 Gemini에 전달해 시장 영향도 3점 이상 기사만 선별."""
+    """
+    전체 헤드라인을 Gemini에 전달해 선별 + 중요도 점수 부여.
+    응답 형식: 번호|중요도 (한 줄씩)
+    _SELECTION_MIN_SCORE 이상인 기사만 반환하며, importance 필드를 추가한다.
+    """
     if not articles:
         return []
 
@@ -405,17 +422,35 @@ def _select_with_gemini(model, articles: list[dict], day: str) -> list[dict]:
     try:
         result = model.generate_content(prompt)
         _log_tokens(result.usage_metadata)
-        raw = result.text.strip().replace("\n", ",")
-        indices = [
-            int(x.strip()) - 1
-            for x in raw.split(",")
-            if x.strip().isdigit()
-        ]
-        selected = [articles[i] for i in indices if 0 <= i < len(articles)]
-        return selected if selected else articles[:5]  # 선별 실패 시 상위 5건 fallback
+
+        selected = []
+        for line in result.text.strip().split("\n"):
+            line = line.strip()
+            if "|" not in line:
+                continue
+            parts = line.split("|")
+            if len(parts) != 2:
+                continue
+            num_str, score_str = parts[0].strip(), parts[1].strip()
+            if not num_str.isdigit() or not score_str.isdigit():
+                continue
+            idx   = int(num_str) - 1
+            score = int(score_str)
+            if 0 <= idx < len(articles) and score >= _SELECTION_MIN_SCORE:
+                article = articles[idx].copy()
+                article["importance"] = score
+                selected.append(article)
+
+        if not selected:
+            print(f"  [{day}] 선별 결과 없음 (fallback: 상위 3건, importance=2)")
+            fallback = [dict(a, importance=2) for a in articles[:3]]
+            return fallback
+
+        return selected
+
     except Exception as e:
         print(f"  Gemini 선별 오류 ({day}): {e}")
-        return articles[:5]
+        return [dict(a, importance=2) for a in articles[:3]]
 
 
 def _select_nvda_with_gemini(model, articles: list[dict], month: str) -> list[dict]:
@@ -572,9 +607,11 @@ def _ensure_index(es: Elasticsearch):
                     "category":     {"type": "keyword"},
                     "source":       {"type": "keyword"},
                     "title":        {"type": "text", "analyzer": "english"},
+                    "title_ko":     {"type": "text"},
                     "url":          {"type": "keyword"},
                     "body":         {"type": "text", "analyzer": "english"},
                     "summary":      {"type": "text"},
+                    "importance":   {"type": "integer"},  # 당시 투자자 중요도 (1~5)
                 }
             }
         },
