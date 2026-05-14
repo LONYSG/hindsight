@@ -29,7 +29,7 @@ export default function SetupPage() {
     setError('')
     try {
       const res = await startSession(selectedStartPoint.id, selectedCompany.id, seedMoney)
-      navigate(`/play/${res.data.sessionId}`, { state: { initialState: res.data } })
+      navigate(`/play/${res.data.sessionId}`, { state: { initialState: res.data, startDate: selectedStartPoint.startDate } })
     } catch (err) {
       setError(err.response?.data?.message || '오류가 발생했습니다.')
       setLoading(false)
