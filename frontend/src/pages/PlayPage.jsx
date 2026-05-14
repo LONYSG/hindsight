@@ -44,9 +44,8 @@ export default function PlayPage() {
   const [activeTab, setActiveTab] = useState('price')
   const [jumping, setJumping] = useState(false)
 
-  // 세션 메타 (차트 범위용): 시작점 날짜와 companyId
-  const companyId  = state?.sessionId ? 2 : 2  // 현재 NVDA 고정
-  const startDate  = location.state?.startDate || '2020-02-01'
+  const companyId = location.state?.companyId || 2
+  const startDate = location.state?.startDate || '2020-02-01'
 
   useEffect(() => {
     if (!state) {
@@ -137,27 +136,27 @@ export default function PlayPage() {
 }
 
 const s = {
-  root:       { height: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0a0a', fontFamily: 'monospace, sans-serif', overflow: 'hidden' },
+  root:       { height: '100vh', display: 'flex', flexDirection: 'column', background: '#0f0f0f', overflow: 'hidden' },
   center:     { color: '#888', textAlign: 'center', marginTop: 100 },
 
   // 헤더
-  header:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', borderBottom: '1px solid #1a1a1a', flexShrink: 0 },
-  headerLeft: { display: 'flex', flexDirection: 'column', gap: 1 },
-  dateLabel:  { color: '#444', fontSize: 10, letterSpacing: 0.5 },
-  date:       { color: '#fff', fontSize: 17, fontWeight: 700 },
+  header:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', borderBottom: '1px solid #1e1e1e', flexShrink: 0 },
+  headerLeft: { display: 'flex', flexDirection: 'column', gap: 2 },
+  dateLabel:  { color: '#555', fontSize: 10, letterSpacing: 0.5 },
+  date:       { color: '#e8e8e8', fontSize: 17, fontWeight: 600 },
   badges:     { display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
   badge:      { borderRadius: 4, padding: '3px 8px', fontSize: 11, fontWeight: 600 },
 
   // 탭바
-  tabBar:     { display: 'flex', borderBottom: '1px solid #1a1a1a', flexShrink: 0 },
-  tabBtn:     { flex: 1, background: 'none', border: 'none', color: '#444', fontSize: 14, cursor: 'pointer', position: 'relative', fontFamily: 'inherit' },
-  tabActive:  { color: '#fff', borderBottom: '2px solid #fff' },
-  dot:        { position: 'absolute', top: 8, right: '28%', width: 6, height: 6, borderRadius: '50%', background: '#f59e0b' },
+  tabBar:     { display: 'flex', borderBottom: '1px solid #1e1e1e', flexShrink: 0 },
+  tabBtn:     { flex: 1, background: 'none', border: 'none', color: '#555', fontSize: 13, fontWeight: 500, cursor: 'pointer', position: 'relative' },
+  tabActive:  { color: '#e8e8e8', borderBottom: '2px solid #e8e8e8' },
+  dot:        { position: 'absolute', top: 8, right: '28%', width: 5, height: 5, borderRadius: '50%', background: '#f59e0b' },
 
   // 컨텐츠
   content:    { flex: 1, overflowY: 'auto', padding: '16px', minHeight: 0 },
 
   // 푸터
-  footer:     { display: 'flex', borderTop: '1px solid #1a1a1a', flexShrink: 0 },
-  jumpBtn:    { flex: 1, background: 'none', border: 'none', color: '#666', fontSize: 13, cursor: 'pointer', borderRight: '1px solid #1a1a1a', fontFamily: 'inherit' },
+  footer:     { display: 'flex', borderTop: '1px solid #1e1e1e', flexShrink: 0 },
+  jumpBtn:    { flex: 1, background: 'none', border: 'none', color: '#888', fontSize: 13, fontWeight: 500, cursor: 'pointer', borderRight: '1px solid #1e1e1e' },
 }
