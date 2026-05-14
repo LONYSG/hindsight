@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { createChart } from 'lightweight-charts'
+import { createChart, CandlestickSeries } from 'lightweight-charts'
 import { getPriceHistory } from '../api/data'
 
 const fmt = (n) => '$' + Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -45,7 +45,7 @@ export default function PriceTab({ state, companyId, startDate }) {
       handleScale: true,
     })
 
-    const series = chart.addCandlestickSeries({
+    const series = chart.addSeries(CandlestickSeries, {
       upColor,
       downColor: dnColor,
       borderUpColor: upColor,
