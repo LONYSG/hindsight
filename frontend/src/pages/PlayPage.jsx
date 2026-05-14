@@ -114,7 +114,7 @@ export default function PlayPage() {
         {activeTab === 'price'     && <PriceTab     state={state} companyId={companyId} startDate={startDate} />}
         {activeTab === 'order'     && <OrderTab     state={state} sessionId={sessionId} onTraded={setState} />}
         {activeTab === 'portfolio' && <PortfolioTab state={state} />}
-        {activeTab === 'news'      && <NewsTab      events={events} />}
+        {activeTab === 'news'      && <NewsTab      events={events} simDate={simDate} />}
       </div>
 
       {/* ── 하단 고정: 날짜 이동 ── */}

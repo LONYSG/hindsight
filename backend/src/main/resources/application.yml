@@ -26,6 +26,11 @@ jwt:
   secret: hindsight-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256
   expiration-ms: 86400000         # 24시간
 
+elasticsearch:
+  host: localhost
+  port: 9200
+  index: hindsight-news
+
 logging:
   level:
     com.hindsight: DEBUG
