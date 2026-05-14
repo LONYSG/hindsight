@@ -1,38 +1,103 @@
-import { useEffect, useState } from 'react'
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { useEffect, useRef, useState } from 'react'
+import { createChart } from 'lightweight-charts'
 import { getPriceHistory } from '../api/data'
 
 const fmt = (n) => '$' + Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtNum = (n) => Number(n ?? 0).toLocaleString('en-US')
 const upColor = '#f43f5e'
-const downColor = '#3b82f6'
+const dnColor = '#3b82f6'
 
 export default function PriceTab({ state, companyId, startDate }) {
   const { simDate, price } = state
-  const [history, setHistory] = useState([])
+  const chartRef = useRef(null)
+  const chartInstance = useRef(null)
+  const seriesRef = useRef(null)
+  const [ready, setReady] = useState(false)
   const up = Number(price.changeRate) >= 0
-  const lineColor = up ? upColor : downColor
 
+  // 차트 초기화 (마운트 시 1회)
   useEffect(() => {
+    if (!chartRef.current) return
+
+    const chart = createChart(chartRef.current, {
+      layout: {
+        background: { color: '#0f0f0f' },
+        textColor: '#666',
+        fontSize: 11,
+      },
+      grid: {
+        vertLines: { color: '#1a1a1a' },
+        horzLines: { color: '#1a1a1a' },
+      },
+      crosshair: {
+        vertLine: { color: '#333' },
+        horzLine: { color: '#333' },
+      },
+      rightPriceScale: {
+        borderColor: '#1a1a1a',
+        textColor: '#666',
+      },
+      timeScale: {
+        borderColor: '#1a1a1a',
+        timeVisible: false,
+      },
+      handleScroll: true,
+      handleScale: true,
+    })
+
+    const series = chart.addCandlestickSeries({
+      upColor,
+      downColor: dnColor,
+      borderUpColor: upColor,
+      borderDownColor: dnColor,
+      wickUpColor: upColor,
+      wickDownColor: dnColor,
+    })
+
+    chartInstance.current = chart
+    seriesRef.current = series
+    setReady(true)
+
+    // 컨테이너 크기 변화 대응
+    const observer = new ResizeObserver(() => {
+      if (chartRef.current) {
+        chart.applyOptions({ width: chartRef.current.clientWidth })
+      }
+    })
+    observer.observe(chartRef.current)
+
+    return () => {
+      observer.disconnect()
+      chart.remove()
+    }
+  }, [])
+
+  // 데이터 로드 (날짜 바뀔 때마다)
+  useEffect(() => {
+    if (!ready || !seriesRef.current) return
     if (!companyId || !startDate || !simDate) return
+
     getPriceHistory(companyId, startDate, simDate)
       .then((r) => {
-        const data = r.data.map((p) => ({ date: p.date, close: Number(p.close) }))
-        setHistory(data)
+        const candles = r.data.map((p) => ({
+          time:  p.date,
+          open:  Number(p.open),
+          high:  Number(p.high),
+          low:   Number(p.low),
+          close: Number(p.close),
+        }))
+        seriesRef.current.setData(candles)
+        chartInstance.current.timeScale().fitContent()
       })
-      .catch(() => setHistory([]))
-  }, [simDate, companyId, startDate])
-
-  const closes = history.map((h) => h.close)
-  const minClose = closes.length ? Math.min(...closes) * 0.995 : 0
-  const maxClose = closes.length ? Math.max(...closes) * 1.005 : 0
+      .catch(() => {})
+  }, [ready, simDate, companyId, startDate])
 
   return (
     <div style={s.root}>
       {/* 현재가 */}
       <div style={s.priceRow}>
-        <span style={{ ...s.closePrice, color: lineColor }}>{fmt(price.close)}</span>
-        <span style={{ ...s.changeRate, color: lineColor }}>
+        <span style={{ ...s.closePrice, color: up ? upColor : dnColor }}>{fmt(price.close)}</span>
+        <span style={{ color: up ? upColor : dnColor, fontSize: 15, fontWeight: 600 }}>
           {up ? '▲' : '▼'} {Math.abs(Number(price.changeRate) * 100).toFixed(2)}%
         </span>
       </div>
@@ -41,58 +106,12 @@ export default function PriceTab({ state, companyId, startDate }) {
       <div style={s.ohlv}>
         <OhlvItem label="시가" value={fmt(price.open)} />
         <OhlvItem label="고가" value={fmt(price.high)} color={upColor} />
-        <OhlvItem label="저가" value={fmt(price.low)} color={downColor} />
+        <OhlvItem label="저가" value={fmt(price.low)} color={dnColor} />
         <OhlvItem label="거래량" value={fmtNum(price.volume)} />
       </div>
 
-      {/* 차트 */}
-      <div style={s.chartWrap}>
-        {history.length > 1 ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={history} margin={{ top: 8, right: 4, left: -8, bottom: 0 }}>
-              <defs>
-                <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor={lineColor} stopOpacity={0.25} />
-                  <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis
-                dataKey="date"
-                tick={{ fill: '#555', fontSize: 10 }}
-                tickFormatter={(d) => d.slice(5)}
-                tickLine={false}
-                axisLine={false}
-                interval="preserveStartEnd"
-              />
-              <YAxis
-                domain={[minClose, maxClose]}
-                tick={{ fill: '#555', fontSize: 10 }}
-                tickFormatter={(v) => `$${v.toFixed(1)}`}
-                tickLine={false}
-                axisLine={false}
-                width={44}
-              />
-              <Tooltip
-                contentStyle={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 6, fontSize: 12 }}
-                labelStyle={{ color: '#888' }}
-                itemStyle={{ color: '#e8e8e8' }}
-                formatter={(v) => [`$${Number(v).toFixed(2)}`, '종가']}
-              />
-              <Area
-                type="monotone"
-                dataKey="close"
-                stroke={lineColor}
-                strokeWidth={1.5}
-                fill="url(#priceGrad)"
-                dot={false}
-                activeDot={{ r: 3, fill: lineColor }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        ) : (
-          <div style={s.chartEmpty}>차트 로딩 중...</div>
-        )}
-      </div>
+      {/* 캔들 차트 */}
+      <div ref={chartRef} style={s.chartWrap} />
     </div>
   )
 }
@@ -107,13 +126,11 @@ function OhlvItem({ label, value, color }) {
 }
 
 const s = {
-  root:       { display: 'flex', flexDirection: 'column', height: '100%', gap: 14 },
-  priceRow:   { display: 'flex', alignItems: 'baseline', gap: 10 },
-  closePrice: { fontSize: 34, fontWeight: 700, letterSpacing: '-0.5px' },
-  changeRate: { fontSize: 15, fontWeight: 600 },
-  ohlv:       { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 0', background: '#161616', borderRadius: 10, padding: '12px 14px' },
-  ohlvItem:   { display: 'flex', justifyContent: 'space-between', paddingRight: 12, alignItems: 'center' },
-  ohlvLabel:  { color: '#666', fontSize: 12 },
-  chartWrap:  { flex: 1, minHeight: 180 },
-  chartEmpty: { color: '#444', textAlign: 'center', paddingTop: 60, fontSize: 13 },
+  root:      { display: 'flex', flexDirection: 'column', height: '100%', gap: 14 },
+  priceRow:  { display: 'flex', alignItems: 'baseline', gap: 10 },
+  closePrice:{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.5px' },
+  ohlv:      { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 0', background: '#161616', borderRadius: 10, padding: '12px 14px' },
+  ohlvItem:  { display: 'flex', justifyContent: 'space-between', paddingRight: 12, alignItems: 'center' },
+  ohlvLabel: { color: '#666', fontSize: 12 },
+  chartWrap: { flex: 1, minHeight: 200 },
 }
