@@ -21,4 +21,7 @@ public interface TradeHistoryRepository extends JpaRepository<TradeHistory, Long
     @Query("SELECT COALESCE(SUM(t.quantity), 0) FROM TradeHistory t " +
            "WHERE t.session.id = :sessionId AND t.action = 'BUY'")
     int calculateTotalBuyQuantity(@Param("sessionId") Long sessionId);
+
+    // 총 거래 횟수 (매수 + 매도 건수)
+    long countBySessionId(Long sessionId);
 }

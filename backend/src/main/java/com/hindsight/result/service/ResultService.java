@@ -81,8 +81,7 @@ public class ResultService {
         BigDecimal nasdaqReturn = rate(endMacro.getNasdaq(), startMacro.getNasdaq());
         BigDecimal alpha        = myReturn.subtract(sp500Return).setScale(6, RoundingMode.HALF_UP);
 
-        int tradeCount = tradeHistoryRepository.calculateTotalBuyQuantity(sessionId)
-                + tradeHistoryRepository.calculateTotalBuyQuantity(sessionId); // 매수+매도 합산 근사
+        int tradeCount = (int) tradeHistoryRepository.countBySessionId(sessionId);
 
         // 결과 저장
         PlayResult result = PlayResult.builder()
@@ -113,7 +112,7 @@ public class ResultService {
     private PlayResultResponse toResponse(PlaySession session, PlayResult result) {
         var snapshot = portfolioSnapshotRepository
                 .findTopBySessionIdOrderByDateDesc(session.getId()).orElseThrow();
-        int tradeCount = tradeHistoryRepository.calculateTotalBuyQuantity(session.getId());
+        int tradeCount = (int) tradeHistoryRepository.countBySessionId(session.getId());
 
         return new PlayResultResponse(
                 session.getId(),
