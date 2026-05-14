@@ -95,7 +95,7 @@ export default function PlayPage() {
       <div style={{ ...s.tabBar, height: TABBAR_H }}>
         {TABS.map(({ key, label }) => {
           const isNews    = key === 'news'
-          const newsAlert = isNews && hasEvents
+          const newsAlert = isNews  // 매일 뉴스 있음
           return (
             <button
               key={key}
