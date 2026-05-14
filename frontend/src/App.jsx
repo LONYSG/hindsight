@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import SetupPage from './pages/SetupPage'
 import PlayPage from './pages/PlayPage'
+import ResultPage from './pages/ResultPage'
 
 function PrivateRoute({ children }) {
   return localStorage.getItem('token') ? children : <Navigate to="/login" replace />
@@ -25,6 +26,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/setup" element={<PrivateRoute><SetupPage /></PrivateRoute>} />
           <Route path="/play/:sessionId" element={<PrivateRoute><PlayPage /></PrivateRoute>} />
+        <Route path="/result/:sessionId" element={<PrivateRoute><ResultPage /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </div>

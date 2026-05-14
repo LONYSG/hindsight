@@ -11,3 +11,9 @@ export const nextDay = (sessionId, jumpType) =>
 
 export const trade = (sessionId, action, quantity) =>
   client.post(`/play/sessions/${sessionId}/trade`, { action, quantity })
+
+export const endSession = (sessionId) =>
+  client.post(`/play/sessions/${sessionId}/end`)
+
+export const getResult = (sessionId) =>
+  client.get(`/play/sessions/${sessionId}/result`)

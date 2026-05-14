@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useParams, useLocation } from 'react-router-dom'
-import { getState, nextDay } from '../api/play'
+import { useParams, useLocation, useNavigate } from 'react-router-dom'
+import { getState, nextDay, endSession } from '../api/play'
 import { useIsMobile } from '../hooks/useIsMobile'
 import PriceTab     from '../tabs/PriceTab'
 import OrderTab     from '../tabs/OrderTab'
@@ -39,10 +39,12 @@ export default function PlayPage() {
   const location = useLocation()
   const isMobile = useIsMobile()
 
+  const navigate = useNavigate()
   const [state, setState] = useState(location.state?.initialState || null)
   const [loading, setLoading] = useState(!location.state?.initialState)
   const [activeTab, setActiveTab] = useState('price')
   const [jumping, setJumping] = useState(false)
+  const [ending, setEnding] = useState(false)
 
   const companyId = location.state?.companyId || 2
   const startDate = location.state?.startDate || '2020-02-01'
@@ -52,6 +54,17 @@ export default function PlayPage() {
       getState(sessionId).then((r) => setState(r.data)).finally(() => setLoading(false))
     }
   }, [sessionId])
+
+  const handleEnd = async () => {
+    if (!window.confirm('게임을 종료하고 결과를 확인할까요?')) return
+    setEnding(true)
+    try {
+      await endSession(sessionId)
+      navigate(`/result/${sessionId}`)
+    } finally {
+      setEnding(false)
+    }
+  }
 
   const handleNext = async (jumpType) => {
     setJumping(true)
@@ -79,15 +92,20 @@ export default function PlayPage() {
           <span style={s.dateLabel}>시뮬레이션 날짜</span>
           <span style={s.date}>{simDate}</span>
         </div>
-        <div style={s.badges}>
-          {events.map((e, i) => {
+        <div style={s.headerRight}>
+          <div style={s.badges}>
+            {events.map((e, i) => {
             const m = EVENT_META[e.eventType] || { label: e.eventType, color: '#888' }
             return (
               <span key={i} style={{ ...s.badge, background: m.color + '22', color: m.color, border: `1px solid ${m.color}44` }}>
                 🔔 {m.label}
               </span>
             )
-          })}
+            })}
+          </div>
+          <button style={s.endBtn} onClick={handleEnd} disabled={ending}>
+            {ending ? '...' : '종료'}
+          </button>
         </div>
       </div>
 
@@ -144,7 +162,9 @@ const s = {
   headerLeft: { display: 'flex', flexDirection: 'column', gap: 2 },
   dateLabel:  { color: '#555', fontSize: 10, letterSpacing: 0.5 },
   date:       { color: '#e8e8e8', fontSize: 17, fontWeight: 600 },
+  headerRight:{ display: 'flex', alignItems: 'center', gap: 8 },
   badges:     { display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
+  endBtn:     { background: 'none', border: '1px solid #333', borderRadius: 6, color: '#888', fontSize: 12, padding: '4px 10px', cursor: 'pointer' },
   badge:      { borderRadius: 4, padding: '3px 8px', fontSize: 11, fontWeight: 600 },
 
   // 탭바
