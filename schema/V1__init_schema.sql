@@ -7,7 +7,7 @@
 -- =====================================================
 CREATE TABLE company (
     id          BIGSERIAL PRIMARY KEY,
-    ticker      VARCHAR(10)  NOT NULL UNIQUE,        -- 티커 (예: AAPL)
+    ticker      VARCHAR(10)  NOT NULL UNIQUE,        -- 티커 (예: NVDA)
     name        VARCHAR(100) NOT NULL,               -- 기업명
     exchange    VARCHAR(20)  NOT NULL,               -- 거래소 (NASDAQ, NYSE)
     created_at  TIMESTAMP    NOT NULL DEFAULT NOW()

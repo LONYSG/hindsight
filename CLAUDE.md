@@ -105,7 +105,7 @@ start_point (id, name, description, start_date)
 
 [기업]
 company (id, ticker, name, exchange)
-예: AAPL, NVDA, TSLA
+예: NVDA (MVP), 이후 AAPL, TSLA 등 확장 예정
 
 [일별 시장 데이터]
 daily_price (id, company_id, date, open, high, low, close, volume)
