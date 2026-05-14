@@ -67,7 +67,7 @@ public class DataController {
         String body = """
                 {
                   "query": { "term": { "date": "%s" } },
-                  "_source": ["title", "summary", "category", "source", "url", "date"],
+                  "_source": ["title", "title_ko", "summary", "category", "source", "url", "date", "published_at"],
                   "size": 30,
                   "sort": [{ "category": "asc" }]
                 }
@@ -91,11 +91,13 @@ public class DataController {
                     Map<String, Object> src = (Map<String, Object>) hit.get("_source");
                     return new NewsArticleResponse(
                             (String) src.get("title"),
+                            (String) src.get("title_ko"),
                             (String) src.get("summary"),
                             (String) src.get("category"),
                             (String) src.get("source"),
                             (String) src.get("url"),
-                            (String) src.get("date")
+                            (String) src.get("date"),
+                            (String) src.get("published_at")
                     );
                 })
                 .toList();

@@ -129,23 +129,70 @@ _NVDA_SELECTION_PROMPT = """\
 # 무료 티어: 분당 15회 호출 → 호출 간 최소 4초
 _GEMINI_FREE_TIER_SLEEP = 4.5
 
-_SUMMARY_PROMPT = """\
-당신은 주식 투자자를 위한 뉴스 요약 전문가입니다.
-아래 뉴스 기사를 읽고, 주식 투자자 관점에서 한국어로 5~6문장으로 요약해주세요.
+_TITLE_KO_PROMPT = """\
+당신은 글로벌 금융 뉴스 헤드라인 전문 번역 시스템입니다.
 
-요약에 반드시 포함할 것:
-1. 무슨 일이 있었는지 (핵심 사실)
-2. 왜 중요한지 (시장/산업 맥락)
-3. 수치가 있으면 포함 (주가, 시총, %, 금리 등)
-4. 반도체·AI·NVIDIA 관련 투자 시사점 (해당되는 경우)
-5. 리스크 또는 불확실성 요인 (있는 경우)
+입력된 영어 뉴스 헤드라인을
+한국 경제뉴스 스타일의 자연스러운 한국어 제목으로 번역하세요.
+
+출력 규칙:
+- 번역된 헤드라인만 출력
+- 설명, 부연, 따옴표, 괄호 설명 추가 금지
+- "번역:" 같은 표현 금지
+- markdown 사용 금지
+- 한 줄로 출력
+
+번역 규칙:
+- 원문의 핵심 의미 유지
+- 과장되거나 감정적인 표현 금지
+- 클릭 유도형 표현 제거
+- 한국 경제뉴스에서 실제 사용할 법한 자연스러운 문장으로 작성
+- 직역투 표현 금지
+- 기업명, 기관명, 국가명은 일반적으로 알려진 한국어 표기 사용
+- ticker symbol이나 고유명사는 필요 시 유지
+- 숫자, 비율, 금액, 금리 정보는 가능하면 유지
+- 의미가 불분명해지지 않는 범위 내에서 간결하게 작성
+- 투자자가 빠르게 핵심을 이해할 수 있게 작성
+
+헤드라인: {title}"""
+
+_SUMMARY_PROMPT = """\
+당신은 글로벌 뉴스 전문 번역 및 요약 시스템입니다.
+
+입력된 영어 뉴스 기사를 읽고,
+핵심 정보만 한국어로 자연스럽고 가독성 좋게 요약하세요.
+
+출력 형식 규칙:
+- 오직 요약 본문만 출력
+- 다른 문장은 절대 추가하지 말 것
+- "다음은 요약입니다", "요약:", "핵심 내용:" 같은 표현 금지
+- 제목 생성 금지
+- 번호 목록 및 불릿 포인트 금지
+- markdown 사용 금지
+- 일반 문단 형태로만 작성
+- 가독성을 위해 의미 단위로 자연스럽게 줄바꿈 사용 가능
+- 문맥이 전환되면 새 줄로 구분 가능
+- 단, 목록 형태처럼 작성하지 말 것
+- 지나치게 긴 한 문단은 피할 것
+
+작성 규칙:
+- 기사 내용이 짧으면 짧게, 중요 정보가 많으면 더 자세히 작성
+- 억지로 분량을 맞추지 말 것
+- 핵심 정보 밀도를 우선할 것
+- 무엇이 발생했는지 명확하게 설명
+- 중요한 기업, 인물, 기관, 국가명 유지
+- 핵심 수치와 데이터는 가능하면 포함
+- 시장 또는 산업 맥락이 중요하면 간략히 포함
+- 향후 변수나 리스크가 중요하면 포함
+- 원문의 의미를 왜곡하지 말 것
+- 한국인이 읽기에 자연스러운 문장으로 번역할 것
+- 직역투 표현 금지
+- 세부 설명보다 핵심 사실 전달을 우선할 것
 
 날짜: {date}
 출처: {source}
 제목: {title}
-내용: {body}
-
-요약:"""
+내용: {body}"""
 
 
 class RateLimitError(Exception):
@@ -221,13 +268,52 @@ def summarize_pending(batch_size: int = 50):
         if not hits:
             break
         for hit in hits:
-            summary = _summarize(model, hit["_source"])
-            es.update(index=_ES_INDEX, id=hit["_id"], body={"doc": {"summary": summary}})
+            title_ko, summary = _summarize(model, hit["_source"])
+            es.update(index=_ES_INDEX, id=hit["_id"], body={"doc": {"title_ko": title_ko, "summary": summary}})
             total += 1
             time.sleep(_GEMINI_FREE_TIER_SLEEP)
         print(f"[summarize_pending] {total}건 완료...")
 
     print(f"[summarize_pending] 완료. 총 {total}건")
+
+
+def re_summarize_all(batch_size: int = 50):
+    """
+    프롬프트 개선 후 전체 재요약.
+    기존 summary/title_ko 를 새 프롬프트로 덮어쓴다.
+    하루 500회 무료 쿼터 → 약 500건/일 처리 가능.
+    """
+    es = _get_es_client()
+    genai.configure(api_key=settings.GEMINI_API_KEY)
+    model = genai.GenerativeModel(settings.GEMINI_MODEL)
+
+    total = 0
+    page = 0
+    while True:
+        resp = es.search(
+            index=_ES_INDEX,
+            query={"match_all": {}},
+            _source=["title", "date", "source", "body"],
+            size=batch_size,
+            from_=page * batch_size,
+            sort=[{"date": "asc"}],
+        )
+        hits = resp["hits"]["hits"]
+        if not hits:
+            break
+        for hit in hits:
+            src = hit["_source"]
+            if not src.get("body"):
+                continue
+            title_ko, summary = _summarize(model, src)
+            es.update(index=_ES_INDEX, id=hit["_id"], body={"doc": {"title_ko": title_ko, "summary": summary}})
+            total += 1
+            time.sleep(_GEMINI_FREE_TIER_SLEEP)
+        page += 1
+        print(f"[re_summarize_all] {total}건 완료...")
+
+    print(f"[re_summarize_all] 전체 완료. 총 {total}건")
+    print_token_stats()
 
 
 # ─── 베이스 레이어 ────────────────────────────────────────────
@@ -264,7 +350,9 @@ def _collect_base(es: Elasticsearch, start_date: str, end_date: str, model, summ
 
         if summarize:
             for a in new_articles:
-                a["summary"] = _summarize(model, a)
+                title_ko, summary = _summarize(model, a)
+                a["title_ko"] = title_ko
+                a["summary"]  = summary
                 time.sleep(_GEMINI_FREE_TIER_SLEEP)  # 무료 티어: 15RPM
 
         saved = _bulk_save(es, new_articles)
@@ -366,7 +454,9 @@ def _collect_nvda(es: Elasticsearch, start_date: str, end_date: str, model):
 
         if model:
             for a in new_articles:
-                a["summary"] = _summarize(model, a)
+                title_ko, summary = _summarize(model, a)
+                a["title_ko"] = title_ko
+                a["summary"]  = summary
                 time.sleep(_GEMINI_FREE_TIER_SLEEP)  # 무료 티어: 15RPM
 
         saved = _bulk_save(es, new_articles)
@@ -405,13 +495,37 @@ def _fetch_guardian_nvda(from_date: str, to_date: str) -> list[dict]:
 
 # ─── Gemini 요약 ──────────────────────────────────────────────
 
-def _summarize(model, article: dict) -> str:
+def _summarize(model, article: dict) -> tuple[str, str]:
+    """
+    (title_ko, summary) 튜플 반환.
+    헤드라인 번역과 본문 요약을 각각 별도 호출로 처리.
+    """
+    title_ko = _translate_title(model, article.get("title", ""))
+    time.sleep(_GEMINI_FREE_TIER_SLEEP)
+    summary  = _summarize_body(model, article)
+    return title_ko, summary
+
+
+def _translate_title(model, title: str) -> str:
+    if not title:
+        return ""
+    prompt = _TITLE_KO_PROMPT.format(title=title)
+    try:
+        result = model.generate_content(prompt)
+        _log_tokens(result.usage_metadata)
+        return result.text.strip()
+    except Exception as e:
+        print(f"  제목 번역 오류 ({title[:40]}): {e}")
+        return ""
+
+
+def _summarize_body(model, article: dict) -> str:
     if not article.get("body"):
         return ""
     prompt = _SUMMARY_PROMPT.format(
-        date=article["date"],
-        source=article["source"],
-        title=article["title"],
+        date=article.get("date", ""),
+        source=article.get("source", ""),
+        title=article.get("title", ""),
         body=article["body"],
     )
     try:
@@ -419,7 +533,7 @@ def _summarize(model, article: dict) -> str:
         _log_tokens(result.usage_metadata)
         return result.text.strip()
     except Exception as e:
-        print(f"  Gemini 요약 오류 ({article['title'][:40]}): {e}")
+        print(f"  본문 요약 오류 ({article.get('title','')[:40]}): {e}")
         return ""
 
 
