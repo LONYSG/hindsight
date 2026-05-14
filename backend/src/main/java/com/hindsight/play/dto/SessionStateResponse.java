@@ -21,11 +21,15 @@ public record SessionStateResponse(
     ) {}
 
     public record PortfolioInfo(
-            BigDecimal cash,
-            int stockQuantity,
-            BigDecimal stockValue,
-            BigDecimal totalValue,
-            BigDecimal returnRate  // 시드머니 대비 수익률
+            BigDecimal cash,           // 예수금
+            int stockQuantity,         // 보유 수량
+            BigDecimal avgBuyPrice,    // 평균 매입단가
+            BigDecimal bookValue,      // 매입금액 (평균단가 × 보유수량)
+            BigDecimal stockValue,     // 주식 평가금액 (현재가 × 보유수량)
+            BigDecimal unrealizedPnl,  // 평가손익 (평가금액 - 매입금액)
+            BigDecimal unrealizedRate, // 평가수익률
+            BigDecimal totalValue,     // 총평가금액 (예수금 + 주식평가금액)
+            BigDecimal returnRate      // 총수익률 (시드 대비)
     ) {}
 
     public record EventInfo(

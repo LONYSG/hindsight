@@ -8,3 +8,6 @@ export const getState = (sessionId) =>
 
 export const nextDay = (sessionId, jumpType) =>
   client.post(`/play/sessions/${sessionId}/next`, { jumpType })
+
+export const trade = (sessionId, action, quantity) =>
+  client.post(`/play/sessions/${sessionId}/trade`, { action, quantity })

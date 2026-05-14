@@ -15,6 +15,8 @@ import com.hindsight.play.entity.PlaySession;
 import com.hindsight.play.entity.PortfolioSnapshot;
 import com.hindsight.play.repository.PlaySessionRepository;
 import com.hindsight.play.repository.PortfolioSnapshotRepository;
+import com.hindsight.trade.dto.TradeRequest;
+import com.hindsight.trade.entity.TradeHistory;
 import com.hindsight.trade.repository.TradeHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -47,7 +49,6 @@ public class PlayService {
         var company = companyRepository.findById(request.companyId())
                 .orElseThrow(() -> new ResourceNotFoundException("기업을 찾을 수 없습니다."));
 
-        // 시작일 이후 첫 번째 실제 거래일 찾기 (DB에 주가 데이터가 있는 날)
         LocalDate firstTradingDay = dailyPriceRepository
                 .findFirstByCompanyIdAndDateGreaterThanEqualOrderByDateAsc(company.getId(), startPoint.getStartDate())
                 .map(DailyPrice::getDate)
@@ -62,7 +63,6 @@ public class PlayService {
         session.advanceDate(firstTradingDay);
         playSessionRepository.save(session);
 
-        // 초기 포트폴리오: 전액 현금, 주식 0
         PortfolioSnapshot snapshot = PortfolioSnapshot.builder()
                 .session(session)
                 .date(firstTradingDay)
@@ -92,7 +92,6 @@ public class PlayService {
 
         session.advanceDate(nextTradingDay);
 
-        // 새 날짜 종가 기준으로 포트폴리오 재계산
         DailyPrice price = dailyPriceRepository
                 .findByCompanyIdAndDate(session.getCompany().getId(), nextTradingDay)
                 .orElseThrow(() -> new IllegalStateException("주가 데이터 오류"));
@@ -115,14 +114,70 @@ public class PlayService {
         return buildState(session);
     }
 
-    private SessionStateResponse buildState(PlaySession session) {
+    @Transactional
+    public SessionStateResponse trade(String email, Long sessionId, TradeRequest request) {
+        PlaySession session = findSessionByOwner(email, sessionId);
+
+        DailyPrice price = dailyPriceRepository
+                .findByCompanyIdAndDate(session.getCompany().getId(), session.getSimDate())
+                .orElseThrow(() -> new IllegalArgumentException("현재 날짜의 주가 데이터가 없습니다."));
+
+        PortfolioSnapshot current = portfolioSnapshotRepository
+                .findTopBySessionIdOrderByDateDesc(sessionId)
+                .orElseThrow(() -> new IllegalStateException("포트폴리오 스냅샷이 없습니다."));
+
+        int heldQuantity = tradeHistoryRepository.calculateHeldQuantity(sessionId);
+        BigDecimal closePrice = price.getClose();
+        int quantity = request.quantity();
+        BigDecimal totalCost = closePrice.multiply(BigDecimal.valueOf(quantity));
+
+        BigDecimal newCash;
+        BigDecimal newStockValue;
+        BigDecimal ratio;
+
+        if (request.action() == TradeRequest.Action.BUY) {
+            if (totalCost.compareTo(current.getCash()) > 0)
+                throw new IllegalArgumentException("현금이 부족합니다. (필요: " + totalCost.toPlainString() + "원)");
+            ratio = totalCost.divide(current.getCash(), 4, RoundingMode.HALF_UP);
+            newCash = current.getCash().subtract(totalCost);
+            newStockValue = closePrice.multiply(BigDecimal.valueOf(heldQuantity + quantity));
+        } else {
+            if (quantity > heldQuantity)
+                throw new IllegalArgumentException("보유 수량이 부족합니다. (보유: " + heldQuantity + "주)");
+            ratio = BigDecimal.valueOf(quantity).divide(BigDecimal.valueOf(heldQuantity), 4, RoundingMode.HALF_UP);
+            newCash = current.getCash().add(totalCost);
+            newStockValue = closePrice.multiply(BigDecimal.valueOf(heldQuantity - quantity));
+        }
+
+        tradeHistoryRepository.save(TradeHistory.builder()
+                .session(session)
+                .date(session.getSimDate())
+                .action(request.action().name())
+                .quantity(quantity)
+                .price(closePrice)
+                .ratio(ratio)
+                .build());
+
+        // 같은 날 여러 번 매매 가능 → 기존 당일 스냅샷 교체
+        portfolioSnapshotRepository.deleteBySessionIdAndDate(sessionId, session.getSimDate());
+        portfolioSnapshotRepository.save(PortfolioSnapshot.builder()
+                .session(session)
+                .date(session.getSimDate())
+                .cash(newCash)
+                .stockValue(newStockValue)
+                .build());
+
+        return buildState(session);
+    }
+
+    SessionStateResponse buildState(PlaySession session) {
         LocalDate simDate = session.getSimDate();
         Long companyId = session.getCompany().getId();
+        Long sessionId = session.getId();
 
         DailyPrice price = dailyPriceRepository.findByCompanyIdAndDate(companyId, simDate)
                 .orElseThrow(() -> new ResourceNotFoundException("주가 데이터가 없습니다: " + simDate));
 
-        // 전일 종가로 변동률 계산
         BigDecimal changeRate = dailyPriceRepository
                 .findFirstByCompanyIdAndDateLessThanOrderByDateDesc(companyId, simDate)
                 .map(prev -> price.getClose().subtract(prev.getClose())
@@ -132,10 +187,22 @@ public class PlayService {
         List<MarketEvent> events = marketEventRepository.findByDateAndCompany(simDate, companyId);
 
         PortfolioSnapshot snapshot = portfolioSnapshotRepository
-                .findTopBySessionIdOrderByDateDesc(session.getId())
+                .findTopBySessionIdOrderByDateDesc(sessionId)
                 .orElseThrow(() -> new IllegalStateException("포트폴리오 스냅샷이 없습니다."));
 
-        int heldQuantity = tradeHistoryRepository.calculateHeldQuantity(session.getId());
+        int heldQuantity = tradeHistoryRepository.calculateHeldQuantity(sessionId);
+
+        // 평균 매입단가 계산
+        int totalBuyQty = tradeHistoryRepository.calculateTotalBuyQuantity(sessionId);
+        BigDecimal totalBuyCost = tradeHistoryRepository.calculateTotalBuyCost(sessionId);
+        BigDecimal avgBuyPrice = totalBuyQty > 0
+                ? totalBuyCost.divide(BigDecimal.valueOf(totalBuyQty), 4, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+        BigDecimal bookValue = avgBuyPrice.multiply(BigDecimal.valueOf(heldQuantity));
+        BigDecimal unrealizedPnl = snapshot.getStockValue().subtract(bookValue);
+        BigDecimal unrealizedRate = bookValue.compareTo(BigDecimal.ZERO) > 0
+                ? unrealizedPnl.divide(bookValue, 6, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
         BigDecimal returnRate = snapshot.getTotalValue()
                 .subtract(session.getSeedMoney())
                 .divide(session.getSeedMoney(), 6, RoundingMode.HALF_UP);
@@ -148,7 +215,8 @@ public class PlayService {
                         price.getClose(), price.getVolume(), changeRate
                 ),
                 new SessionStateResponse.PortfolioInfo(
-                        snapshot.getCash(), heldQuantity, snapshot.getStockValue(),
+                        snapshot.getCash(), heldQuantity, avgBuyPrice, bookValue,
+                        snapshot.getStockValue(), unrealizedPnl, unrealizedRate,
                         snapshot.getTotalValue(), returnRate
                 ),
                 events.stream()

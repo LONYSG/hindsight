@@ -9,7 +9,7 @@ export default function SetupPage() {
   const [companies, setCompanies] = useState([])
   const [selectedStartPoint, setSelectedStartPoint] = useState(null)
   const [selectedCompany, setSelectedCompany] = useState(null)
-  const [seedMoney, setSeedMoney] = useState(10000000)
+  const [seedMoney, setSeedMoney] = useState(10000)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -78,13 +78,13 @@ export default function SetupPage() {
         <section style={styles.section}>
           <h3 style={styles.label}>시드머니</h3>
           <div style={styles.seedRow}>
-            {[1000000, 5000000, 10000000, 50000000].map((v) => (
+            {[1000, 10000, 50000, 100000].map((v) => (
               <button
                 key={v}
                 style={seedMoney === v ? styles.seedActive : styles.seed}
                 onClick={() => setSeedMoney(v)}
               >
-                {(v / 10000).toLocaleString()}만원
+                ${v.toLocaleString()}
               </button>
             ))}
           </div>
