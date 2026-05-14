@@ -21,7 +21,10 @@ public class DailyMacro {
     private LocalDate date;
 
     private BigDecimal fedRate;
+
+    @Column(name = "us_10y_yield")
     private BigDecimal us10yYield;
+
     private BigDecimal usdKrw;
     private BigDecimal sp500;
     private BigDecimal nasdaq;
