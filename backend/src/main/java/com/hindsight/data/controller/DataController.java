@@ -60,18 +60,32 @@ public class DataController {
     }
 
     // 해당 날짜 뉴스 조회 (Elasticsearch)
+    // minImportance: 최소 중요도 (기본 3). importance 필드 없는 레거시 기사는 항상 포함.
     @GetMapping("/news")
-    public List<NewsArticleResponse> getNews(@RequestParam String date) {
+    public List<NewsArticleResponse> getNews(
+            @RequestParam String date,
+            @RequestParam(defaultValue = "3") int minImportance
+    ) {
         String url = "http://%s:%d/%s/_search".formatted(esHost, esPort, esIndex);
 
+        // importance >= minImportance 이거나, importance 필드 자체가 없는 기사(레거시) 포함
         String body = """
                 {
-                  "query": { "term": { "date": "%s" } },
-                  "_source": ["title", "title_ko", "summary", "category", "source", "url", "date", "published_at"],
-                  "size": 30,
-                  "sort": [{ "category": "asc" }]
+                  "query": {
+                    "bool": {
+                      "must": [{ "term": { "date": "%s" } }],
+                      "should": [
+                        { "range": { "importance": { "gte": %d } } },
+                        { "bool": { "must_not": { "exists": { "field": "importance" } } } }
+                      ],
+                      "minimum_should_match": 1
+                    }
+                  },
+                  "_source": ["title", "title_ko", "summary", "category", "source", "url", "date", "published_at", "importance"],
+                  "size": 50,
+                  "sort": [{ "importance": { "order": "desc", "missing": 3 } }, { "category": "asc" }]
                 }
-                """.formatted(date);
+                """.formatted(date, minImportance);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -89,6 +103,7 @@ public class DataController {
                 .map(hit -> {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> src = (Map<String, Object>) hit.get("_source");
+                    Object imp = src.get("importance");
                     return new NewsArticleResponse(
                             (String) src.get("title"),
                             (String) src.get("title_ko"),
@@ -97,7 +112,8 @@ public class DataController {
                             (String) src.get("source"),
                             (String) src.get("url"),
                             (String) src.get("date"),
-                            (String) src.get("published_at")
+                            (String) src.get("published_at"),
+                            imp != null ? ((Number) imp).intValue() : null
                     );
                 })
                 .toList();

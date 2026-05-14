@@ -290,6 +290,19 @@ def summarize_pending(batch_size: int = 50):
     print(f"[summarize_pending] 완료. 총 {total}건")
 
 
+def reset_index():
+    """
+    ES 인덱스 초기화 (재수집 전 실행).
+    기존 데이터 전체 삭제 후 새 매핑으로 재생성.
+    """
+    es = _get_es_client()
+    if es.indices.exists(index=_ES_INDEX):
+        es.indices.delete(index=_ES_INDEX)
+        print(f"[reset_index] '{_ES_INDEX}' 인덱스 삭제 완료")
+    _ensure_index(es)
+    print(f"[reset_index] '{_ES_INDEX}' 인덱스 재생성 완료 (importance 필드 포함)")
+
+
 def re_summarize_all(batch_size: int = 50):
     """
     프롬프트 개선 후 전체 재요약.
