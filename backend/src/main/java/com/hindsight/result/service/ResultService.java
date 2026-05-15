@@ -2,7 +2,6 @@ package com.hindsight.result.service;
 
 import com.hindsight.auth.repository.UserRepository;
 import com.hindsight.data.entity.DailyMacro;
-import com.hindsight.data.entity.DailyPrice;
 import com.hindsight.data.repository.DailyMacroRepository;
 import com.hindsight.data.repository.DailyPriceRepository;
 import com.hindsight.global.exception.ResourceNotFoundException;
@@ -45,17 +44,6 @@ public class ResultService {
 
         var startDate = session.getStartPoint().getStartDate();
         var endDate   = session.getSimDate();
-        var companyId = session.getCompany().getId();
-
-        // 시작일 주가 (첫 거래일)
-        DailyPrice startPrice = dailyPriceRepository
-                .findFirstByCompanyIdAndDateGreaterThanEqualOrderByDateAsc(companyId, startDate)
-                .orElseThrow(() -> new ResourceNotFoundException("시작일 주가 데이터 없음"));
-
-        // 종료일 주가
-        DailyPrice endPrice = dailyPriceRepository
-                .findByCompanyIdAndDate(companyId, endDate)
-                .orElseThrow(() -> new ResourceNotFoundException("종료일 주가 데이터 없음"));
 
         // 시작일 거시지표
         DailyMacro startMacro = dailyMacroRepository
@@ -77,7 +65,6 @@ public class ResultService {
         BigDecimal seedMoney  = session.getSeedMoney();
 
         BigDecimal myReturn     = rate(finalValue, seedMoney);
-        BigDecimal stockReturn  = rate(endPrice.getClose(), startPrice.getClose());
         BigDecimal sp500Return  = rate(endMacro.getSp500(), startMacro.getSp500());
         BigDecimal nasdaqReturn = rate(endMacro.getNasdaq(), startMacro.getNasdaq());
         BigDecimal alpha        = myReturn.subtract(sp500Return).setScale(6, RoundingMode.HALF_UP);
@@ -93,7 +80,7 @@ public class ResultService {
         PlayResult result = PlayResult.builder()
                 .session(session)
                 .myReturn(myReturn)
-                .stockReturn(stockReturn)
+                .stockReturn(null)   // 멀티 포트폴리오 - 단일 종목 수익률 미사용
                 .sp500Return(sp500Return)
                 .nasdaqReturn(nasdaqReturn)
                 .alpha(alpha)

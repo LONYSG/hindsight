@@ -7,29 +7,31 @@ import java.util.List;
 public record SessionStateResponse(
         Long sessionId,
         LocalDate simDate,
-        PriceInfo price,
-        PortfolioInfo portfolio,
+        List<HoldingInfo> holdings,   // 보유 종목별 현황
+        PortfolioInfo portfolio,       // 포트폴리오 총합
         List<EventInfo> events
 ) {
-    public record PriceInfo(
-            BigDecimal open,
-            BigDecimal high,
-            BigDecimal low,
-            BigDecimal close,
-            long volume,
-            BigDecimal changeRate  // 전일 종가 대비 변동률 (소수, 예: 0.025 = +2.5%)
+    // 보유 종목별 현황 (보유 수량 > 0인 기업만)
+    public record HoldingInfo(
+            Long companyId,
+            String ticker,
+            String name,
+            BigDecimal currentPrice,
+            BigDecimal changeRate,
+            int quantity,
+            BigDecimal avgBuyPrice,
+            BigDecimal bookValue,
+            BigDecimal stockValue,
+            BigDecimal unrealizedPnl,
+            BigDecimal unrealizedRate
     ) {}
 
+    // 포트폴리오 총합
     public record PortfolioInfo(
-            BigDecimal cash,           // 예수금
-            int stockQuantity,         // 보유 수량
-            BigDecimal avgBuyPrice,    // 평균 매입단가
-            BigDecimal bookValue,      // 매입금액 (평균단가 × 보유수량)
-            BigDecimal stockValue,     // 주식 평가금액 (현재가 × 보유수량)
-            BigDecimal unrealizedPnl,  // 평가손익 (평가금액 - 매입금액)
-            BigDecimal unrealizedRate, // 평가수익률
-            BigDecimal totalValue,     // 총평가금액 (예수금 + 주식평가금액)
-            BigDecimal returnRate      // 총수익률 (시드 대비)
+            BigDecimal cash,
+            BigDecimal totalStockValue,
+            BigDecimal totalValue,
+            BigDecimal returnRate
     ) {}
 
     public record EventInfo(

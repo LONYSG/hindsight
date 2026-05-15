@@ -1,6 +1,5 @@
 package com.hindsight.play.entity;
 
-import com.hindsight.data.entity.Company;
 import com.hindsight.data.entity.StartPoint;
 import jakarta.persistence.*;
 import lombok.*;
@@ -19,17 +18,12 @@ public class PlaySession {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // auth.User와 도메인 간 결합 방지 — FK는 DB가 보장, JPA 관계 미설정
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "start_point_id", nullable = false)
     private StartPoint startPoint;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "company_id", nullable = false)
-    private Company company;
 
     @Column(nullable = false)
     private BigDecimal seedMoney;
@@ -47,10 +41,9 @@ public class PlaySession {
     private LocalDateTime updatedAt;
 
     @Builder
-    public PlaySession(Long userId, StartPoint startPoint, Company company, BigDecimal seedMoney) {
+    public PlaySession(Long userId, StartPoint startPoint, BigDecimal seedMoney) {
         this.userId = userId;
         this.startPoint = startPoint;
-        this.company = company;
         this.seedMoney = seedMoney;
         this.simDate = startPoint.getStartDate();
         this.status = "IN_PROGRESS";

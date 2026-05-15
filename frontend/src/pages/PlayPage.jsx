@@ -46,7 +46,6 @@ export default function PlayPage() {
   const [jumping, setJumping] = useState(false)
   const [ending, setEnding] = useState(false)
 
-  const companyId = location.state?.companyId || 2
   const startDate = location.state?.startDate || '2020-02-01'
 
   useEffect(() => {
@@ -129,7 +128,7 @@ export default function PlayPage() {
 
       {/* ── 탭 컨텐츠 ── */}
       <div style={{ ...s.content, height: contentH, maxWidth: isMobile ? '100%' : 760, margin: '0 auto', width: '100%' }}>
-        {activeTab === 'price'     && <PriceTab     state={state} companyId={companyId} startDate={startDate} />}
+        {activeTab === 'price'     && <PriceTab     state={state} startDate={startDate} />}
         {activeTab === 'order'     && <OrderTab     state={state} sessionId={sessionId} onTraded={setState} />}
         {activeTab === 'portfolio' && <PortfolioTab state={state} />}
         {activeTab === 'news'      && <NewsTab      events={events} simDate={simDate} sessionId={sessionId} />}

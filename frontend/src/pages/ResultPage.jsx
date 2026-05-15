@@ -10,7 +10,6 @@ const rateColor = (v) => Number(v) >= 0 ? upColor : downColor
 
 const BENCHMARKS = [
   { key: 'myReturn',     label: '내 수익률',  isMine: true },
-  { key: 'stockReturn',  label: 'NVDA' },
   { key: 'nasdaqReturn', label: 'NASDAQ' },
   { key: 'sp500Return',  label: 'S&P 500' },
 ]

@@ -4,6 +4,9 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
 public record TradeRequest(
+        @NotNull(message = "기업을 선택해주세요")
+        Long companyId,
+
         @NotNull(message = "매매 방향을 선택해주세요")
         Action action,
 

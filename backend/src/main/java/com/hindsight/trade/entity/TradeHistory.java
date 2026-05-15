@@ -1,5 +1,6 @@
 package com.hindsight.trade.entity;
 
+import com.hindsight.data.entity.Company;
 import com.hindsight.play.entity.PlaySession;
 import jakarta.persistence.*;
 import lombok.*;
@@ -22,6 +23,10 @@ public class TradeHistory {
     @JoinColumn(name = "session_id", nullable = false)
     private PlaySession session;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
     @Column(nullable = false)
     private LocalDate date;
 
@@ -40,9 +45,10 @@ public class TradeHistory {
     private LocalDateTime createdAt;
 
     @Builder
-    public TradeHistory(PlaySession session, LocalDate date, String action,
-                        Integer quantity, BigDecimal price, BigDecimal ratio) {
+    public TradeHistory(PlaySession session, Company company, LocalDate date,
+                        String action, Integer quantity, BigDecimal price, BigDecimal ratio) {
         this.session = session;
+        this.company = company;
         this.date = date;
         this.action = action;
         this.quantity = quantity;
