@@ -258,10 +258,231 @@ com.hindsight
 
 ---
 
+---
+
+## 2026-05-14
+
+### 12. Spring Boot 서버 첫 실행
+
+**한 것:**
+Java 17 설치 후 `./gradlew bootRun` 으로 서버 첫 실행 성공. 회원가입/로그인 API 테스트 완료.
+
+**문제:** WSL 환경에 Java 8만 설치되어 있어 Spring Boot 3.5.0 실행 불가 (최소 Java 17 필요).
+
+**해결:** `sudo apt install openjdk-17-jdk` 후 시스템 기본 Java 버전 전환.
+
+**결과:** 회원가입 201, 중복 이메일 400, 로그인 200 + JWT 토큰 정상 동작 확인.
+
+---
+
+### 13. 플레이 세션 API 구현
+
+**한 것:**
+게임의 핵심 3개 API 구현.
+
+| API | 설명 |
+|---|---|
+| `POST /api/play/sessions` | 게임 시작 (시드머니, 시작점, 기업 선택) |
+| `GET /api/play/sessions/{id}/state` | 현재 날짜 주가 + 포트폴리오 + 이벤트 조회 |
+| `POST /api/play/sessions/{id}/next` | 날짜 점프 (NEXT_DAY / WEEK / MONTH / THREE_MONTHS) |
+
+**엔티티 설계 주요 결정:**
+
+`PlaySession.userId`를 JPA `@ManyToOne`으로 `User`에 연결하지 않고 `Long` 타입으로만 저장한 이유:
+`auth` 도메인의 `User` 엔티티를 `play` 도메인이 직접 참조하면 도메인 간 결합이 생긴다. FK는 DB가 보장하고, JPA 관계는 맺지 않는 방식으로 도메인 경계를 지켰다.
+
+`portfolio_snapshot`에 UNIQUE(session_id, date) 제약이 있어, 같은 날 여러 번 매매 시 중복 INSERT 에러가 발생했다. 해결: 매매 전 해당 날짜 스냅샷을 DELETE 후 재삽입.
+
+**관련 PR:** #7
+
+---
+
+### 14. 매수/매도 API
+
+**한 것:**
+`POST /api/play/sessions/{id}/trade` 구현. 수량(quantity) 기반 매수/매도.
+
+**핵심 계산:**
+- 매수가능수량: `floor(현금 / 종가)`
+- 매도가능수량: trade_history의 BUY - SELL 누적
+- 매입금액(book value): `평균매입단가 × 보유수량` (가중평균 방식)
+- 평가손익: `주식평가금액 - 매입금액`
+
+**포트폴리오 필드 (증권사 MTS 스타일):**
+예수금, 주식평가금액, 매입금액, 평가손익, 평가수익률, 총평가금액, 총수익률(시드 대비)
+
+**단위 문제:**
+시드머니를 원화로 입력하고 NVDA는 달러라 단위가 섞이는 문제 발견.
+**결정: 달러 통일.** 시드머니를 달러($1K / $10K / $50K / $100K)로 선택하도록 변경.
+
+---
+
+### 15. React 프론트엔드 구현
+
+**한 것:**
+Vite + React 프로젝트 초기화 후 3개 페이지 구현.
+
+**페이지 구성:**
+- `LoginPage`: 로그인/회원가입 탭 전환
+- `SetupPage`: 시작점/기업/시드머니 선택
+- `PlayPage`: 탭 기반 플레이 화면 (시세/주문/잔고/뉴스)
+- `ResultPage`: 수익률 비교 + 알파 결과 화면
+
+**기술 결정:**
+
+*Vite 프록시 설정:*
+`/api` → `http://localhost:8080` 프록시. 프론트(5173)와 백엔드(8080) 포트가 달라서 생기는 CORS 문제를 이 방법으로 해결. 브라우저 요청은 Vite 서버를 거쳐 백엔드로 전달되므로 CORS 정책에 걸리지 않는다.
+
+*JWT 자동 첨부:*
+axios 인터셉터로 모든 요청에 `Authorization: Bearer <token>` 자동 추가. 401 응답 시 로그인 페이지로 자동 리다이렉트.
+
+*`useIsMobile` 훅:*
+768px 기준으로 PC/모바일 레이아웃 전환. 모든 컴포넌트가 이 훅 하나로 반응형 처리.
+
+*max-width 480px 중앙정렬:*
+무신사 등 모바일 우선 서비스처럼 PC에서도 앱처럼 보이게. 양쪽에 여백이 생겨 집중감 향상.
+
+*Inter 폰트:*
+Google Fonts에서 로드. 기본 시스템 폰트보다 가독성 좋고 현대적.
+
+---
+
+### 16. 탭 기반 PlayPage 재설계
+
+**왜 탭으로 바꿨나:**
+초기 구현은 모든 정보(주가, 포트폴리오, 주문창, 뉴스)를 한 페이지에 세로로 나열해서 스크롤이 길었다. 실제 MTS 앱처럼 탭으로 분리해서 각 기능에 집중.
+
+**구조:**
+```
+[헤더: 날짜 + 이벤트 배지 + 종료 버튼]  ← 고정
+[탭바: 시세 / 주문 / 잔고 / 뉴스]        ← 고정
+[탭 컨텐츠]                               ← 스크롤 없음
+[날짜 이동: 다음날 / 1주일 / 1달 / 3달]  ← 고정
+```
+
+---
+
+### 17. 캔들스틱 차트
+
+**라이브러리:** TradingView `lightweight-charts` v5
+
+*recharts를 쓰지 않은 이유:*
+recharts는 라인/바 차트에 적합하지만 캔들스틱 지원이 약하다. lightweight-charts는 실제 증권 차트 라이브러리라 OHLC 캔들봉을 네이티브로 지원하고 성능도 좋다.
+
+**주의:** v5에서 API 변경 - `chart.addCandlestickSeries()` → `chart.addSeries(CandlestickSeries, options)`. 버전 변경 시 반드시 확인.
+
+**색상:** 상승 빨강(#f43f5e), 하락 파랑(#3b82f6) - 한국 증권사 MTS 스타일.
+
+---
+
+### 18. 뉴스 탭 ES 연동
+
+**한 것:**
+`GET /api/data/news?date=YYYY-MM-DD&minImportance=3` 구현.
+RestTemplate으로 Spring Boot → ES REST API 직접 호출.
+
+**장전/장중/장후 배지:**
+Guardian의 `published_at` (ISO 타임스탬프)를 파싱해서 미국 장 시간 기준으로 분류.
+- 장전: UTC 14:30 미만 (EST 09:30 전)
+- 장중: UTC 14:30 ~ 21:00
+- 장후: UTC 21:00 이후
+
+중요도 별점(★)도 함께 표시. "약한 신호 보기" 토글로 importance 2점짜리도 확인 가능.
+
+---
+
+### 19. 결과 화면 (ResultPage)
+
+**한 것:**
+게임 종료 시 수익률 계산 + 알파 산출 + 결과 화면 표시.
+
+**알파 계산:**
+`α = 내 수익률 - S&P500 수익률`
+
+**benchmark 데이터 출처:**
+`daily_macro` 테이블의 `sp500`, `nasdaq` 필드.
+
+**JPA 컬럼명 주의사항:**
+Spring의 `SpringPhysicalNamingStrategy`는 숫자 뒤에 오는 대문자에는 언더스코어를 붙이지 않는다. `sp500Return` → `sp500return` (틀림). 해결: `@Column(name = "sp500_return")` 명시.
+
+---
+
+### 20. 프로젝트 철학 정립 (ChatGPT 세션 인사이트)
+
+오늘 사용자와 ChatGPT 간 대화에서 중요한 설계 원칙들이 도출됐다.
+
+**핵심 철학:**
+> "과거 특정 시점의 투자자가 되어, 당시 존재했던 정보만으로 투자 판단을 체험하는 것"
+
+이 프로젝트는 차트 리플레이 앱이 아니라 **역사적 투자 판단 시뮬레이션**이다.
+
+**뉴스 시스템 설계 원칙:**
+- **저장은 넓게, 플레이는 압축**: importance >= 2까지 저장, 기본 플레이에서는 >= 3만 노출
+- **Precision < Recall**: 약한 신호를 놓치는 것이 노이즈를 포함하는 것보다 위험
+- **importance는 정답 힌트가 아님**: UI 강조/이벤트 크기 조절용
+
+**Hindsight 시스템 결정:**
+현재 단계에서 hindsight significance는 **구현하지 않는다.**
+
+이유:
+- 단일 뉴스 → 주가 인과관계 단정은 위험 (correlation ≠ causation)
+- Flash 모델로 장기 역사 significance 판단은 신뢰성이 낮음
+- MVP에서는 "당시 정보 환경 체험"이 핵심
+
+미래 Hindsight Layer 설계안 (Phase 4 이후):
+```
+Raw News: headline, summary, timestamp, importance (당시 기준)
+Scenario Layer: scenario_id, historical_significance, retrospective_commentary
+```
+같은 뉴스도 시나리오(AI 붐, 코로나, 금리인상)마다 significance가 다를 수 있다.
+
+---
+
+### 21. 뉴스 선별 프롬프트 전면 개편
+
+**변경 이유:**
+기존 프롬프트는 너무 엄격해서 약한 신호를 놓쳤다. "3점 이상만" 고정 필터를 "2점 이상 저장, 3점 이상 노출" 구조로 변경.
+
+**응답 형식 변경:**
+```
+기존: 3,7,12,18
+신규: 3|5, 7|4, 12|3  (번호|중요도)
+```
+
+importance 점수를 선별 단계에서부터 저장하게 됨.
+
+**요약 프롬프트 분리:**
+- `_TITLE_KO_PROMPT`: 헤드라인 한국어 번역 전용
+- `_SUMMARY_PROMPT`: 본문 요약 전용
+
+두 프롬프트 모두 사용자가 직접 작성. 형식 제약 엄격히 명시 ("요약:", 번호 목록 금지 등).
+
+---
+
+### 22. 뉴스 재수집 결정
+
+**이유:**
+- 기존 3개월치 데이터는 구 프롬프트로 수집 (importance 없음, 엄격한 필터)
+- 새 프롬프트 + importance 점수 포함 재수집 필요
+
+**재수집 절차:**
+```bash
+# 1. ES 초기화
+venv/bin/python3 -c "from collectors.news_collector import reset_index; reset_index()"
+
+# 2. 수집 (Guardian API, summarize=False)
+venv/bin/python3 -c "from collectors.news_collector import collect; collect('2020-02-01','2020-04-30', summarize=False)"
+
+# 3. 요약 + 제목번역 (Gemini, 하루 ~250건 처리 가능)
+venv/bin/python3 -c "from collectors.news_collector import re_summarize_all; re_summarize_all()"
+```
+
+---
+
 ## 다음에 할 것
 
-- [ ] `summarize_pending()` 실행 → 뉴스 496건 Gemini 요약 채우기
-- [ ] `./gradlew bootRun` → Spring Boot 서버 실행 확인
-- [ ] 플레이 세션 API 구현 (시작/진행/종료)
-- [ ] 매수/매도 API 구현
-- [ ] FOMC, CPI 캘린더 이벤트 수집 (market_event 테이블)
+- [ ] 뉴스 재수집 실행 (1, 2단계: Guardian API, Gemini 쿼터 무관)
+- [ ] 요약 재실행 (3단계: Gemini 쿼터 리셋 후, 하루 ~250건)
+- [ ] PR 머지 → develop 반영 ✅ (오늘 완료)
+- [ ] FOMC/CPI 캘린더 이벤트 수집 (market_event 테이블)
+- [ ] 인프라 (docker-compose 정리, GitHub Actions CI/CD)

@@ -1,22 +1,19 @@
 """
 뉴스 수집기 - The Guardian API
 
-[베이스 레이어] 하루씩 쿼리 → Gemini 선별 → 선별된 기사만 저장
+하루씩 쿼리 → Gemini 선별 → 선별된 기사만 저장
   Guardian BUSINESS    (business|money 섹션, 하루치 전체)
   Guardian TECHNOLOGY  (technology 섹션, 하루치 전체)
   Guardian WORLD       (world|us-news|politics 섹션, 하루치 전체)
-  → 전체 헤드라인을 Gemini에 전달 → 시장 영향도 3점 이상만 선별
-
-[NVDA 레이어] 월 단위 배치 → 전량 저장 (Gemini 선별 없음)
-  Guardian NVDA_DIRECT (nvidia 키워드, 월 최대 200건)
+  → 전체 헤드라인을 Gemini에 전달 → 미국 투자자 관점 중요도 2점 이상만 선별
 
 Guardian 500회/일 한도 도달 시 자동 중단 → 재실행 시 이어서 진행
-URL 기준 중복 제거 → NVDA 뉴스가 베이스에서도 선별되면 1건만 저장
+URL 기준 중복 제거
 """
 
+import json
 import re
 import time
-import calendar
 from datetime import date, timedelta
 
 import requests
@@ -115,92 +112,82 @@ _SELECTION_PROMPT = """\
 # 선별 최소 중요도 (이 이상인 기사만 저장)
 _SELECTION_MIN_SCORE = 2
 
-_NVDA_SELECTION_PROMPT = """\
-당신은 NVIDIA 주식 투자자를 위한 뉴스 필터 AI입니다.
-
-아래 기사들은 "nvidia" 키워드로 검색된 결과입니다.
-실제로 NVIDIA 또는 AI/반도체 투자와 직접 관련 있는 기사만 선택하세요.
-
-[선택 기준]
-- NVIDIA 제품, 실적, 전략, CEO/임원 발언에 관한 기사
-- AI/반도체 산업에서 NVIDIA의 역할이 핵심인 기사
-- NVIDIA 주가, 시총, 투자 의견에 관한 기사
-- NVIDIA에 직접 영향을 주는 규제·공급망·경쟁사 동향
-
-[제외 기준]
-- NVIDIA가 본문에서 단 한 번만 부수적으로 언급된 기사
-- 주제가 다른 기사에 NVIDIA가 예시로만 나온 경우
-- 미국 시장과 무관한 지역 내수 뉴스
-
-동일 사건은 가장 포괄적인 기사 1개만 선택하세요.
-
-헤드라인 목록:
-{headlines}
-
-선택한 번호만 쉼표로 구분하여 출력하세요."""
-
 # 무료 티어: 분당 15회 호출 → 호출 간 최소 4초
 _GEMINI_FREE_TIER_SLEEP = 4.5
 
-_TITLE_KO_PROMPT = """\
-당신은 글로벌 금융 뉴스 헤드라인 전문 번역 시스템입니다.
-
-입력된 영어 뉴스 헤드라인을
-한국 경제뉴스 스타일의 자연스러운 한국어 제목으로 번역하세요.
-
-출력 규칙:
-- 번역된 헤드라인만 출력
-- 설명, 부연, 따옴표, 괄호 설명 추가 금지
-- "번역:" 같은 표현 금지
-- markdown 사용 금지
-- 한 줄로 출력
-
-번역 규칙:
-- 원문의 핵심 의미 유지
-- 과장되거나 감정적인 표현 금지
-- 클릭 유도형 표현 제거
-- 한국 경제뉴스에서 실제 사용할 법한 자연스러운 문장으로 작성
-- 직역투 표현 금지
-- 기업명, 기관명, 국가명은 일반적으로 알려진 한국어 표기 사용
-- ticker symbol이나 고유명사는 필요 시 유지
-- 숫자, 비율, 금액, 금리 정보는 가능하면 유지
-- 의미가 불분명해지지 않는 범위 내에서 간결하게 작성
-- 투자자가 빠르게 핵심을 이해할 수 있게 작성
-
-헤드라인: {title}"""
+_VALID_THEMES = {
+    "AI", "SEMICONDUCTOR", "CLOUD", "SOFTWARE", "ROBOTICS",
+    "EV", "ENERGY", "NUCLEAR", "BIOTECH", "HEALTHCARE",
+    "FINANCE", "CRYPTO", "DEFENSE", "AEROSPACE",
+    "GEOPOLITICS", "CHINA", "TRADE",
+    "MACRO", "FED", "RATE", "INFLATION", "SUPPLY_CHAIN",
+    "CONSUMER", "RETAIL", "MANUFACTURING", "CYBERSECURITY", "DATA_CENTER",
+    "OTHER",
+}
 
 _SUMMARY_PROMPT = """\
-당신은 글로벌 뉴스 전문 번역 및 요약 시스템입니다.
+당신은 글로벌 금융 뉴스 분석 시스템입니다.
 
-입력된 영어 뉴스 기사를 읽고,
-핵심 정보만 한국어로 자연스럽고 가독성 좋게 요약하세요.
+아래 뉴스 기사를 읽고 세 가지를 생성하세요.
+반드시 순수 JSON만 출력하세요. markdown / code block / 설명 문장 일절 금지.
 
-출력 형식 규칙:
-- 오직 요약 본문만 출력
-- 다른 문장은 절대 추가하지 말 것
-- "다음은 요약입니다", "요약:", "핵심 내용:" 같은 표현 금지
-- 제목 생성 금지
-- 번호 목록 및 불릿 포인트 금지
-- markdown 사용 금지
-- 일반 문단 형태로만 작성
-- 가독성을 위해 의미 단위로 자연스럽게 줄바꿈 사용 가능
-- 문맥이 전환되면 새 줄로 구분 가능
-- 단, 목록 형태처럼 작성하지 말 것
-- 지나치게 긴 한 문단은 피할 것
+[title_ko]
+- 한국 경제뉴스 스타일의 자연스러운 한국어 제목
+- 원문 핵심 의미 유지, 직역투 금지
+- 기업명·기관명은 통용 한국어 표기 사용
+- 숫자·비율·금액 정보 가능하면 유지
+- 한 줄로 작성
 
-작성 규칙:
-- 기사 내용이 짧으면 짧게, 중요 정보가 많으면 더 자세히 작성
-- 억지로 분량을 맞추지 말 것
-- 핵심 정보 밀도를 우선할 것
-- 무엇이 발생했는지 명확하게 설명
-- 중요한 기업, 인물, 기관, 국가명 유지
-- 핵심 수치와 데이터는 가능하면 포함
-- 시장 또는 산업 맥락이 중요하면 간략히 포함
-- 향후 변수나 리스크가 중요하면 포함
-- 원문의 의미를 왜곡하지 말 것
-- 한국인이 읽기에 자연스러운 문장으로 번역할 것
-- 직역투 표현 금지
-- 세부 설명보다 핵심 사실 전달을 우선할 것
+[summary]
+- 한국어 요약 본문만 출력 (제목·레이블·불릿·번호 목록 금지)
+- markdown 사용 금지, 일반 문단 형태
+- 핵심 정보 밀도 우선, 억지 분량 맞추기 금지
+- 핵심 수치·데이터 포함
+
+[themes]
+아래 허용 목록에서만 선택. 최대 3개. 애매하면 억지 분류 말고 OTHER 사용.
+
+허용 목록:
+AI, SEMICONDUCTOR, CLOUD, SOFTWARE, ROBOTICS,
+EV, ENERGY, NUCLEAR, BIOTECH, HEALTHCARE,
+FINANCE, CRYPTO, DEFENSE, AEROSPACE,
+GEOPOLITICS, CHINA, TRADE,
+MACRO, FED, RATE, INFLATION, SUPPLY_CHAIN,
+CONSUMER, RETAIL, MANUFACTURING, CYBERSECURITY, DATA_CENTER,
+OTHER
+
+태그 정의 (유사 태그 구분 기준 포함):
+- AI: 인공지능 기술·제품·연구·기업
+- SEMICONDUCTOR: 반도체 설계·제조·장비·소재
+- CLOUD: 클라우드 인프라·서비스·하이퍼스케일러
+- SOFTWARE: 소프트웨어·SaaS·플랫폼·앱
+- ROBOTICS: 로봇공학·자동화 하드웨어
+- EV: 전기차·배터리·충전 인프라
+- ENERGY: 에너지·석유·가스·재생에너지
+- NUCLEAR: 원자력·소형모듈원자로(SMR)
+- BIOTECH: 바이오기술·신약개발·임상
+- HEALTHCARE: 의료기기·병원·보험·헬스케어 시스템
+- FINANCE: 금융·은행·보험·자산운용
+- CRYPTO: 암호화폐·블록체인·디지털자산
+- DEFENSE: 방산·무기·군사기술
+- AEROSPACE: 항공우주·위성·발사체
+- GEOPOLITICS: 지정학·전쟁·국제정치 (중국 관련은 CHINA 사용)
+- CHINA: 중국 경제·규제·공급망·대만 이슈
+- TRADE: 무역·관세·수출규제·통상정책
+- MACRO: 거시경제·GDP·고용·경기지표 (FED·RATE·INFLATION 제외)
+- FED: 연준 정책·FOMC 결정·연준 발언
+- RATE: 금리 인상·인하·채권금리 변화
+- INFLATION: CPI·PPI·물가·인플레이션 지표
+- SUPPLY_CHAIN: 공급망·물류·부품 수급
+- CONSUMER: 소비자 지출·소비심리
+- RETAIL: 소매·유통·이커머스
+- MANUFACTURING: 제조업·공장·생산지수·PMI
+- CYBERSECURITY: 사이버보안·해킹·데이터침해
+- DATA_CENTER: 데이터센터·AI 인프라·서버·전력 수요
+- OTHER: 위 테마에 해당하지 않는 경우
+
+출력 형식 (이 외의 텍스트 일절 금지):
+{{"title_ko": "...", "summary": "...", "themes": ["THEME1", "THEME2"]}}
 
 날짜: {date}
 출처: {source}
@@ -246,11 +233,7 @@ def collect(start_date: str, end_date: str, summarize: bool = False):
     model = genai.GenerativeModel(settings.GEMINI_MODEL)
 
     try:
-        print("[news_collector] 베이스 레이어 수집 시작")
         _collect_base(es, start_date, end_date, model, summarize)
-
-        print("[news_collector] NVDA 레이어 수집 시작")
-        _collect_nvda(es, start_date, end_date, model if summarize else None)
 
     except RateLimitError:
         print()
@@ -281,8 +264,13 @@ def summarize_pending(batch_size: int = 50):
         if not hits:
             break
         for hit in hits:
-            title_ko, summary = _summarize(model, hit["_source"])
-            es.update(index=_ES_INDEX, id=hit["_id"], body={"doc": {"title_ko": title_ko, "summary": summary}})
+            r = _summarize(model, hit["_source"])
+            es.update(index=_ES_INDEX, id=hit["_id"], body={"doc": {
+                "title_ko": r["title_ko"],
+                "summary":  r["summary"],
+                "themes":   r["themes"],
+                "llm_raw":  r["llm_raw"],
+            }})
             total += 1
             time.sleep(_GEMINI_FREE_TIER_SLEEP)
         print(f"[summarize_pending] {total}건 완료...")
@@ -331,8 +319,13 @@ def re_summarize_all(batch_size: int = 50):
             src = hit["_source"]
             if not src.get("body"):
                 continue
-            title_ko, summary = _summarize(model, src)
-            es.update(index=_ES_INDEX, id=hit["_id"], body={"doc": {"title_ko": title_ko, "summary": summary}})
+            r = _summarize(model, src)
+            es.update(index=_ES_INDEX, id=hit["_id"], body={"doc": {
+                "title_ko": r["title_ko"],
+                "summary":  r["summary"],
+                "themes":   r["themes"],
+                "llm_raw":  r["llm_raw"],
+            }})
             total += 1
             time.sleep(_GEMINI_FREE_TIER_SLEEP)
         page += 1
@@ -376,10 +369,12 @@ def _collect_base(es: Elasticsearch, start_date: str, end_date: str, model, summ
 
         if summarize:
             for a in new_articles:
-                title_ko, summary = _summarize(model, a)
-                a["title_ko"] = title_ko
-                a["summary"]  = summary
-                time.sleep(_GEMINI_FREE_TIER_SLEEP)  # 무료 티어: 15RPM
+                r = _summarize(model, a)
+                a["title_ko"] = r["title_ko"]
+                a["summary"]  = r["summary"]
+                a["themes"]   = r["themes"]
+                a["llm_raw"]  = r["llm_raw"]
+                time.sleep(_GEMINI_FREE_TIER_SLEEP)
 
         saved = _bulk_save(es, new_articles)
         total_saved += saved
@@ -466,110 +461,17 @@ def _select_with_gemini(model, articles: list[dict], day: str) -> list[dict]:
         return [dict(a, importance=2) for a in articles[:3]]
 
 
-def _select_nvda_with_gemini(model, articles: list[dict], month: str) -> list[dict]:
-    """NVDA 키워드 검색 결과에서 실제 NVIDIA 관련 기사만 선별."""
-    if not articles:
-        return []
-    headlines = "\n".join(
-        f"{i+1}. {a['title']}" for i, a in enumerate(articles)
-    )
-    prompt = _NVDA_SELECTION_PROMPT.format(headlines=headlines)
-    try:
-        result = model.generate_content(prompt)
-        _log_tokens(result.usage_metadata)
-        time.sleep(_GEMINI_FREE_TIER_SLEEP)
-        raw = result.text.strip().replace("\n", ",")
-        indices = [int(x.strip()) - 1 for x in raw.split(",") if x.strip().isdigit()]
-        selected = [articles[i] for i in indices if 0 <= i < len(articles)]
-        return selected if selected else []
-    except Exception as e:
-        print(f"  Gemini NVDA 선별 오류 ({month}): {e}")
-        return articles
-
-
-# ─── NVDA 레이어 ──────────────────────────────────────────────
-
-def _collect_nvda(es: Elasticsearch, start_date: str, end_date: str, model):
-    months = _get_month_ranges(start_date, end_date)
-    total_saved = 0
-
-    for i, (month_start, month_end) in enumerate(months, 1):
-        articles = _fetch_guardian_nvda(month_start, month_end)
-
-        # NVDA 관련성 Gemini 선별 (키워드 검색의 false positive 제거)
-        selected = _select_nvda_with_gemini(model, articles, month_start)
-        new_articles = _filter_existing(es, selected)
-
-        if model:
-            for a in new_articles:
-                title_ko, summary = _summarize(model, a)
-                a["title_ko"] = title_ko
-                a["summary"]  = summary
-                time.sleep(_GEMINI_FREE_TIER_SLEEP)  # 무료 티어: 15RPM
-
-        saved = _bulk_save(es, new_articles)
-        total_saved += saved
-
-        if i % 12 == 0 or i == len(months):
-            print(f"  {month_start[:7]} ({i}/{len(months)}) 누적 {total_saved}건")
-        time.sleep(1.1)
-
-    print(f"[news_collector] NVDA 수집 완료. 총 {total_saved}건")
-
-
-def _fetch_guardian_nvda(from_date: str, to_date: str) -> list[dict]:
-    params = {
-        "from-date":   from_date,
-        "to-date":     to_date,
-        "q":           "nvidia",
-        "section":     "technology|business|money",
-        "show-fields": "headline,trailText,bodyText",
-        "page-size":   200,
-        "order-by":    "relevance",
-        "api-key":     settings.GUARDIAN_API_KEY,
-    }
-    try:
-        resp = requests.get(_GUARDIAN_URL, params=params, timeout=15)
-        if resp.status_code == 429:
-            raise RateLimitError()
-        resp.raise_for_status()
-        return [_parse_guardian(r, "NVDA_DIRECT") for r in resp.json()["response"]["results"]]
-    except RateLimitError:
-        raise
-    except Exception as e:
-        print(f"  Guardian NVDA {from_date} 오류: {e}")
-        return []
-
-
 # ─── Gemini 요약 ──────────────────────────────────────────────
 
-def _summarize(model, article: dict) -> tuple[str, str]:
+def _summarize(model, article: dict) -> dict:
     """
-    (title_ko, summary) 튜플 반환.
-    헤드라인 번역과 본문 요약을 각각 별도 호출로 처리.
+    JSON 단일 호출로 title_ko + summary + themes 생성.
+    반환: {"title_ko": str, "summary": str, "themes": list, "llm_raw": str}
     """
-    title_ko = _translate_title(model, article.get("title", ""))
-    time.sleep(_GEMINI_FREE_TIER_SLEEP)
-    summary  = _summarize_body(model, article)
-    return title_ko, summary
-
-
-def _translate_title(model, title: str) -> str:
-    if not title:
-        return ""
-    prompt = _TITLE_KO_PROMPT.format(title=title)
-    try:
-        result = model.generate_content(prompt)
-        _log_tokens(result.usage_metadata)
-        return result.text.strip()
-    except Exception as e:
-        print(f"  제목 번역 오류 ({title[:40]}): {e}")
-        return ""
-
-
-def _summarize_body(model, article: dict) -> str:
+    _empty = {"title_ko": "", "summary": "", "themes": ["OTHER"], "llm_raw": ""}
     if not article.get("body"):
-        return ""
+        return _empty
+
     prompt = _SUMMARY_PROMPT.format(
         date=article.get("date", ""),
         source=article.get("source", ""),
@@ -579,10 +481,25 @@ def _summarize_body(model, article: dict) -> str:
     try:
         result = model.generate_content(prompt)
         _log_tokens(result.usage_metadata)
-        return result.text.strip()
+        raw = result.text.strip()
+
+        clean = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("`").strip()
+        parsed = json.loads(clean)
+
+        title_ko = parsed.get("title_ko", "").strip()
+        summary  = parsed.get("summary", "").strip()
+        themes   = [
+            t for t in parsed.get("themes", [])
+            if isinstance(t, str) and t in _VALID_THEMES
+        ][:3]
+        if not themes:
+            themes = ["OTHER"]
+
+        return {"title_ko": title_ko, "summary": summary, "themes": themes, "llm_raw": raw}
+
     except Exception as e:
-        print(f"  본문 요약 오류 ({article.get('title','')[:40]}): {e}")
-        return ""
+        print(f"  요약 오류 ({article.get('title', '')[:40]}): {e}")
+        return _empty
 
 
 # ─── 파싱 ────────────────────────────────────────────────────
@@ -624,7 +541,9 @@ def _ensure_index(es: Elasticsearch):
                     "url":          {"type": "keyword"},
                     "body":         {"type": "text", "analyzer": "english"},
                     "summary":      {"type": "text"},
-                    "importance":   {"type": "integer"},  # 당시 투자자 중요도 (1~5)
+                    "importance":   {"type": "integer"},
+                    "themes":       {"type": "keyword"},
+                    "llm_raw":      {"type": "text", "index": False},
                 }
             }
         },
@@ -679,23 +598,6 @@ def _bulk_save(es: Elasticsearch, articles: list[dict]) -> int:
 
 
 # ─── 유틸 ────────────────────────────────────────────────────
-
-def _get_month_ranges(start: str, end: str) -> list[tuple[str, str]]:
-    start_dt = date.fromisoformat(start)
-    end_dt = date.fromisoformat(end)
-    ranges = []
-    cur = start_dt.replace(day=1)
-    while cur <= end_dt:
-        last_day = calendar.monthrange(cur.year, cur.month)[1]
-        month_end = cur.replace(day=last_day)
-        ranges.append((
-            max(cur, start_dt).strftime("%Y-%m-%d"),
-            min(month_end, end_dt).strftime("%Y-%m-%d"),
-        ))
-        cur = cur.replace(month=cur.month + 1) if cur.month < 12 \
-            else cur.replace(year=cur.year + 1, month=1)
-    return ranges
-
 
 def _clean_text(text: str) -> str:
     text = re.sub(r"<[^>]+>", " ", text)

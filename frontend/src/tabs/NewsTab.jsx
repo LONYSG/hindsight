@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react'
 import { getNews } from '../api/data'
 
 const CATEGORY_META = {
-  BUSINESS:    { label: 'Business',   color: '#60a5fa' },
-  TECHNOLOGY:  { label: 'Technology', color: '#a78bfa' },
-  WORLD:       { label: 'World',      color: '#34d399' },
-  NVDA_DIRECT: { label: 'NVDA',       color: '#f59e0b' },
+  BUSINESS:   { label: 'Business',   color: '#60a5fa' },
+  TECHNOLOGY: { label: 'Technology', color: '#a78bfa' },
+  WORLD:      { label: 'World',      color: '#34d399' },
 }
 
 const IMPORTANCE_LABEL = { 5: '★★★★★', 4: '★★★★', 3: '★★★', 2: '★★', 1: '★' }
