@@ -31,4 +31,16 @@ public class DailyIndicator {
 
     @Column(name = "macd_histogram")
     private BigDecimal macdHistogram;
+
+    @Column(name = "ichimoku_tenkan")
+    private BigDecimal ichimokuTenkan;
+
+    @Column(name = "ichimoku_kijun")
+    private BigDecimal ichimokuKijun;
+
+    @Column(name = "ichimoku_senkou_a")
+    private BigDecimal ichimokuSenkouA;
+
+    @Column(name = "ichimoku_senkou_b")
+    private BigDecimal ichimokuSenkouB;
 }

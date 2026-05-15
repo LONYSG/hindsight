@@ -73,7 +73,9 @@ public class DataController {
                 .stream()
                 .map(i -> new IndicatorResponse(
                         i.getDate().toString(),
-                        i.getRsi(), i.getMacd(), i.getMacdSignal(), i.getMacdHistogram()
+                        i.getRsi(), i.getMacd(), i.getMacdSignal(), i.getMacdHistogram(),
+                        i.getIchimokuTenkan(), i.getIchimokuKijun(),
+                        i.getIchimokuSenkouA(), i.getIchimokuSenkouB()
                 ))
                 .toList();
     }

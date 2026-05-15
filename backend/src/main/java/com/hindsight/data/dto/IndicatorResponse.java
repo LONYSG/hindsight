@@ -7,5 +7,9 @@ public record IndicatorResponse(
         BigDecimal rsi,
         BigDecimal macd,
         BigDecimal macdSignal,
-        BigDecimal macdHistogram
+        BigDecimal macdHistogram,
+        BigDecimal ichimokuTenkan,
+        BigDecimal ichimokuKijun,
+        BigDecimal ichimokuSenkouA,
+        BigDecimal ichimokuSenkouB
 ) {}
