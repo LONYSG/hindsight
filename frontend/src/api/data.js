@@ -7,3 +7,6 @@ export const getPriceHistory = (companyId, from, to) =>
 
 export const getNews = (date, minImportance = 3) =>
   client.get('/data/news', { params: { date, minImportance } })
+
+export const getIndicators = (companyId, from, to) =>
+  client.get('/data/indicators', { params: { companyId, from, to } })

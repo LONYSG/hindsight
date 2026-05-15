@@ -127,7 +127,7 @@ export default function PlayPage() {
       </div>
 
       {/* ── 탭 컨텐츠 ── */}
-      <div style={{ ...s.content, height: contentH, maxWidth: isMobile ? '100%' : 760, margin: '0 auto', width: '100%' }}>
+      <div style={{ ...s.content, height: contentH, maxWidth: isMobile ? '100%' : 760, margin: '0 auto', width: '100%', overflow: activeTab === 'price' ? 'hidden' : 'auto' }}>
         {activeTab === 'price'     && <PriceTab     state={state} startDate={startDate} />}
         {activeTab === 'order'     && <OrderTab     state={state} sessionId={sessionId} onTraded={setState} />}
         {activeTab === 'portfolio' && <PortfolioTab state={state} />}

@@ -1,10 +1,12 @@
 package com.hindsight.data.controller;
 
 import com.hindsight.data.dto.CompanyResponse;
+import com.hindsight.data.dto.IndicatorResponse;
 import com.hindsight.data.dto.NewsArticleResponse;
 import com.hindsight.data.dto.PriceHistoryResponse;
 import com.hindsight.data.dto.StartPointResponse;
 import com.hindsight.data.repository.CompanyRepository;
+import com.hindsight.data.repository.DailyIndicatorRepository;
 import com.hindsight.data.repository.DailyPriceRepository;
 import com.hindsight.data.repository.StartPointRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ public class DataController {
     private final StartPointRepository startPointRepository;
     private final CompanyRepository companyRepository;
     private final DailyPriceRepository dailyPriceRepository;
+    private final DailyIndicatorRepository dailyIndicatorRepository;
     private final RestTemplate restTemplate;
 
     @Value("${elasticsearch.host}") private String esHost;
@@ -56,6 +59,22 @@ public class DataController {
                 .findByCompanyIdAndDateBetweenOrderByDateAsc(companyId, from, to)
                 .stream()
                 .map(PriceHistoryResponse::from)
+                .toList();
+    }
+
+    @GetMapping("/indicators")
+    public List<IndicatorResponse> getIndicators(
+            @RequestParam Long companyId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return dailyIndicatorRepository
+                .findByCompanyIdAndDateBetweenOrderByDateAsc(companyId, from, to)
+                .stream()
+                .map(i -> new IndicatorResponse(
+                        i.getDate().toString(),
+                        i.getRsi(), i.getMacd(), i.getMacdSignal(), i.getMacdHistogram()
+                ))
                 .toList();
     }
 
