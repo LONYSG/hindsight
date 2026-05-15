@@ -17,3 +17,9 @@ export const endSession = (sessionId) =>
 
 export const getResult = (sessionId) =>
   client.get(`/play/sessions/${sessionId}/result`)
+
+export const recordNewsView = (sessionId, newsEsId) =>
+  client.post(`/play/sessions/${sessionId}/news-view`, { newsEsId }).catch(() => {})
+
+export const getNewsViewThemes = (sessionId) =>
+  client.get(`/play/sessions/${sessionId}/news-view/themes`)

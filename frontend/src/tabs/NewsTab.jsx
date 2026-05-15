@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getNews } from '../api/data'
+import { recordNewsView } from '../api/play'
 
 const CATEGORY_META = {
   BUSINESS:   { label: 'Business',   color: '#60a5fa' },
@@ -9,6 +10,8 @@ const CATEGORY_META = {
 
 const IMPORTANCE_LABEL = { 5: '★★★★★', 4: '★★★★', 3: '★★★', 2: '★★', 1: '★' }
 const IMPORTANCE_COLOR = { 5: '#f59e0b', 4: '#f59e0b', 3: '#888', 2: '#555', 1: '#444' }
+
+const THEME_COLOR = '#6366f1'
 
 // UTC 기준 미국 동부 시장 시간 판단 (EST = UTC-5)
 function getMarketTiming(publishedAt) {
@@ -25,7 +28,7 @@ function cleanSummary(text) {
   return text.replace(/^요약\s*:\s*/i, '').replace(/^\[요약\]\s*/i, '').trim()
 }
 
-export default function NewsTab({ simDate }) {
+export default function NewsTab({ simDate, sessionId }) {
   const [articles, setArticles] = useState([])
   const [loading, setLoading] = useState(false)
   const [expanded, setExpanded] = useState(null)
@@ -78,7 +81,11 @@ export default function NewsTab({ simDate }) {
 
           return (
             <div key={i} style={{ ...s.card, opacity: isWeak ? 0.7 : 1 }}
-                 onClick={() => setExpanded(isOpen ? null : i)}>
+                 onClick={() => {
+                   const opening = !isOpen
+                   setExpanded(opening ? i : null)
+                   if (opening && sessionId && a.id) recordNewsView(sessionId, a.id)
+                 }}>
 
               {/* 배지 행 */}
               <div style={s.badges}>
@@ -123,6 +130,13 @@ export default function NewsTab({ simDate }) {
                       ⏱ {timing.tip}
                     </div>
                   )}
+                  {a.themes?.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 10 }}>
+                      {a.themes.map(t => (
+                        <span key={t} style={s.themeBadge}>{t}</span>
+                      ))}
+                    </div>
+                  )}
                   <a href={a.url} target="_blank" rel="noopener noreferrer" style={s.link}
                      onClick={e => e.stopPropagation()}>
                     원문 보기 →
@@ -157,6 +171,7 @@ const s = {
   summaryPara: { color: '#bbb', fontSize: 13, lineHeight: 1.75, margin: 0 },
   noSummary:   { color: '#444', fontSize: 13 },
   link:        { display: 'inline-block', marginTop: 10, color: '#60a5fa', fontSize: 12, textDecoration: 'none' },
+  themeBadge:  { fontSize: 10, color: THEME_COLOR, background: THEME_COLOR + '18', border: `1px solid ${THEME_COLOR}33`, borderRadius: 3, padding: '2px 6px', fontWeight: 600 },
   empty:       { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 10 },
   emptyIcon:   { fontSize: 36 },
   emptyTitle:  { color: '#555', fontSize: 15, fontWeight: 600 },

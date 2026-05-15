@@ -7,11 +7,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 public interface PortfolioSnapshotRepository extends JpaRepository<PortfolioSnapshot, Long> {
 
     Optional<PortfolioSnapshot> findTopBySessionIdOrderByDateDesc(Long sessionId);
+
+    List<PortfolioSnapshot> findBySessionIdOrderByDateAsc(Long sessionId);
 
     // 같은 날 매수/매도 시 기존 스냅샷 교체
     @Modifying

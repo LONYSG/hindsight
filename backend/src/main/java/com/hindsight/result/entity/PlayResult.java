@@ -35,18 +35,30 @@ public class PlayResult {
 
     private BigDecimal alpha;
 
+    private BigDecimal mdd;
+
+    @Column(name = "cash_ratio_avg")
+    private BigDecimal cashRatioAvg;
+
+    @Column(name = "trade_count")
+    private Integer tradeCount;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
     public PlayResult(PlaySession session, BigDecimal myReturn, BigDecimal stockReturn,
-                      BigDecimal nasdaqReturn, BigDecimal sp500Return, BigDecimal alpha) {
+                      BigDecimal nasdaqReturn, BigDecimal sp500Return, BigDecimal alpha,
+                      BigDecimal mdd, BigDecimal cashRatioAvg, Integer tradeCount) {
         this.session = session;
         this.myReturn = myReturn;
         this.stockReturn = stockReturn;
         this.nasdaqReturn = nasdaqReturn;
         this.sp500Return = sp500Return;
         this.alpha = alpha;
+        this.mdd = mdd;
+        this.cashRatioAvg = cashRatioAvg;
+        this.tradeCount = tradeCount;
         this.createdAt = LocalDateTime.now();
     }
 }

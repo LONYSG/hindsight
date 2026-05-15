@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -83,6 +84,11 @@ public class ResultService {
 
         int tradeCount = (int) tradeHistoryRepository.countBySessionId(sessionId);
 
+        // MDD + 평균 현금 비율 계산
+        var snapshots = portfolioSnapshotRepository.findBySessionIdOrderByDateAsc(sessionId);
+        BigDecimal mdd          = calcMdd(snapshots, seedMoney);
+        BigDecimal cashRatioAvg = calcCashRatioAvg(snapshots);
+
         // 결과 저장
         PlayResult result = PlayResult.builder()
                 .session(session)
@@ -91,6 +97,9 @@ public class ResultService {
                 .sp500Return(sp500Return)
                 .nasdaqReturn(nasdaqReturn)
                 .alpha(alpha)
+                .mdd(mdd)
+                .cashRatioAvg(cashRatioAvg)
+                .tradeCount(tradeCount)
                 .build();
         playResultRepository.save(result);
 
@@ -112,7 +121,9 @@ public class ResultService {
     private PlayResultResponse toResponse(PlaySession session, PlayResult result) {
         var snapshot = portfolioSnapshotRepository
                 .findTopBySessionIdOrderByDateDesc(session.getId()).orElseThrow();
-        int tradeCount = (int) tradeHistoryRepository.countBySessionId(session.getId());
+        int tradeCount = result.getTradeCount() != null
+                ? result.getTradeCount()
+                : (int) tradeHistoryRepository.countBySessionId(session.getId());
 
         return new PlayResultResponse(
                 session.getId(),
@@ -125,8 +136,33 @@ public class ResultService {
                 result.getSp500Return(),
                 result.getNasdaqReturn(),
                 result.getAlpha(),
-                tradeCount
+                tradeCount,
+                result.getMdd(),
+                result.getCashRatioAvg()
         );
+    }
+
+    private BigDecimal calcMdd(List<com.hindsight.play.entity.PortfolioSnapshot> snapshots, BigDecimal seedMoney) {
+        BigDecimal peak = seedMoney;
+        BigDecimal maxDrawdown = BigDecimal.ZERO;
+        for (var s : snapshots) {
+            BigDecimal value = s.getTotalValue();
+            if (value.compareTo(peak) > 0) peak = value;
+            if (peak.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal drawdown = peak.subtract(value).divide(peak, 6, RoundingMode.HALF_UP);
+                if (drawdown.compareTo(maxDrawdown) > 0) maxDrawdown = drawdown;
+            }
+        }
+        return maxDrawdown;
+    }
+
+    private BigDecimal calcCashRatioAvg(List<com.hindsight.play.entity.PortfolioSnapshot> snapshots) {
+        if (snapshots.isEmpty()) return BigDecimal.ONE;
+        BigDecimal sum = snapshots.stream()
+                .filter(s -> s.getTotalValue().compareTo(BigDecimal.ZERO) > 0)
+                .map(s -> s.getCash().divide(s.getTotalValue(), 6, RoundingMode.HALF_UP))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return sum.divide(BigDecimal.valueOf(snapshots.size()), 6, RoundingMode.HALF_UP);
     }
 
     private BigDecimal rate(BigDecimal end, BigDecimal start) {

@@ -81,7 +81,7 @@ public class DataController {
                       "minimum_should_match": 1
                     }
                   },
-                  "_source": ["title", "title_ko", "summary", "category", "source", "url", "date", "published_at", "importance"],
+                  "_source": ["title", "title_ko", "summary", "category", "source", "url", "date", "published_at", "importance", "themes"],
                   "size": 50,
                   "sort": [{ "importance": { "order": "desc", "missing": 3 } }, { "category": "asc" }]
                 }
@@ -104,7 +104,10 @@ public class DataController {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> src = (Map<String, Object>) hit.get("_source");
                     Object imp = src.get("importance");
+                    @SuppressWarnings("unchecked")
+                    List<String> themes = (List<String>) src.get("themes");
                     return new NewsArticleResponse(
+                            (String) hit.get("_id"),
                             (String) src.get("title"),
                             (String) src.get("title_ko"),
                             (String) src.get("summary"),
@@ -113,7 +116,8 @@ public class DataController {
                             (String) src.get("url"),
                             (String) src.get("date"),
                             (String) src.get("published_at"),
-                            imp != null ? ((Number) imp).intValue() : null
+                            imp != null ? ((Number) imp).intValue() : null,
+                            themes != null ? themes : List.of()
                     );
                 })
                 .toList();

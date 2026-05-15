@@ -14,5 +14,7 @@ public record PlayResultResponse(
         BigDecimal sp500Return,    // S&P500 수익률
         BigDecimal nasdaqReturn,   // NASDAQ 수익률
         BigDecimal alpha,          // 알파 (내 수익률 - S&P500)
-        int tradeCount             // 총 거래 횟수
+        int tradeCount,            // 총 거래 횟수
+        BigDecimal mdd,            // 최대 낙폭 (0.18 = -18%)
+        BigDecimal cashRatioAvg    // 평균 현금 비율 (0.4 = 40%)
 ) {}

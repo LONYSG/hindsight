@@ -7,6 +7,7 @@ from collectors.price_collector import collect as collect_price
 from collectors.macro_collector import collect as collect_macro
 from collectors.news_collector import collect as collect_news
 from processors.event_detector import detect as detect_events
+from processors.calendar_event_loader import load as load_calendar_events
 
 
 def main():
@@ -22,6 +23,9 @@ def main():
 
     # 이벤트 감지 (PRICE_SPIKE, VOLUME_SPIKE)
     detect_events(ticker="NVDA")
+
+    # 캘린더 이벤트 (FOMC, CPI, EARNINGS)
+    load_calendar_events(start_date="2019-10-01", end_date=today)
 
     # 뉴스 수집 (Guardian + NYT, Gemini 요약 제외 - 별도 승인 후 summarize_pending() 실행)
     collect_news(start_date="2019-10-01", end_date=today, summarize=False)
