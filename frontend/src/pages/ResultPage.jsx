@@ -8,49 +8,47 @@ const upColor   = '#f43f5e'
 const downColor = '#3b82f6'
 const rateColor = (v) => Number(v) >= 0 ? upColor : downColor
 
-const BENCHMARKS = [
-  { key: 'myReturn',     label: '내 수익률',  isMine: true },
-  { key: 'nasdaqReturn', label: 'NASDAQ' },
-  { key: 'sp500Return',  label: 'S&P 500' },
-]
-
 export default function ResultPage() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError]   = useState(false)
   const [viewedThemes, setViewedThemes] = useState([])
 
   useEffect(() => {
     getResult(sessionId)
       .then((r) => setResult(r.data))
+      .catch(() => setError(true))
       .finally(() => setLoading(false))
     getNewsViewThemes(sessionId)
       .then((r) => setViewedThemes(r.data.themes ?? []))
       .catch(() => {})
   }, [sessionId])
 
-  if (loading) return <div style={s.center}>결과 계산 중...</div>
-  if (!result)  return <div style={s.center}>결과를 불러올 수 없습니다</div>
+  if (loading) return (
+    <div style={s.loadingWrap}>
+      <div style={s.spinner} />
+      <div style={s.loadingText}>결과 계산 중...</div>
+    </div>
+  )
+  if (error || !result) return <div style={s.center}>결과를 불러올 수 없습니다</div>
 
-  const beatMarket = Number(result.alpha) > 0
+  const beatMarket  = Number(result.alpha) > 0
   const myReturnNum = Number(result.myReturn)
-  const alphaNum    = Number(result.alpha)
+  const days        = Math.round((new Date(result.endDate) - new Date(result.startDate)) / 86400000)
+  const tendencies  = getTendencies(result, days)
 
-  const behaviorText = getBehaviorText(result)
-
-  // 비교 차트용 최대 절댓값
-  const allRates = BENCHMARKS.map(b => Math.abs(Number(result[b.key] ?? 0)))
-  const maxAbs   = Math.max(...allRates, 0.01)
-
-  const days = Math.round((new Date(result.endDate) - new Date(result.startDate)) / 86400000)
+  // 수익률 비교: 내 수익률 + NASDAQ + M7 (내림차순)
+  const compareItems = buildCompareItems(result)
+  const maxAbs = Math.max(...compareItems.filter(it => !it.isDivider).map(it => Math.abs(it.value)), 0.01)
 
   return (
     <div style={s.root}>
 
       {/* 헤더 */}
       <div style={s.header}>
-        <div style={s.headerTitle}>게임 결과</div>
+        <div style={s.headerTitle}>투자 결과 리포트</div>
         <div style={s.headerSub}>{result.startDate} → {result.endDate} ({days}일)</div>
       </div>
 
@@ -73,7 +71,7 @@ export default function ResultPage() {
           <span style={{ ...s.myReturnValue, color: rateColor(result.myReturn) }}>{pct(result.myReturn)}</span>
         </div>
         <div style={s.alphaRow}>
-          <span style={s.alphaLabel}>알파 (vs S&P500)</span>
+          <span style={s.alphaLabel}>알파 (vs NASDAQ)</span>
           <span style={{ ...s.alphaValue, color: rateColor(result.alpha) }}>{pct(result.alpha)}</span>
         </div>
         <div style={{ ...s.verdict, color: beatMarket ? upColor : downColor }}>
@@ -81,36 +79,62 @@ export default function ResultPage() {
         </div>
       </div>
 
-      {/* 수익률 비교 바 차트 */}
+      {/* 수익률 비교 — 0 기준 발산 바 차트 */}
       <div style={s.card}>
         <div style={s.sectionLabel}>수익률 비교</div>
-        {BENCHMARKS.map(({ key, label, isMine }) => {
-          const val    = Number(result[key] ?? 0)
-          const barW   = Math.abs(val) / maxAbs * 100
-          const color  = isMine
-            ? (val >= 0 ? upColor : downColor)
-            : '#444'
+        {compareItems.map(({ key, label, value, isMine, isDivider }) => {
+          if (isDivider) return (
+            <div key={key} style={s.dividerRow}>
+              <div style={s.dividerLine} />
+              <span style={s.dividerLabel}>종목별</span>
+              <div style={s.dividerLine} />
+            </div>
+          )
+          const halfW = Math.abs(value) / maxAbs * 50  // 전체 너비의 0~50%
+          const color = rateColor(value)
+          const isPos = value >= 0
           return (
             <div key={key} style={s.barRow}>
-              <div style={s.barLabel}>{label}</div>
-              <div style={s.barTrack}>
-                <div style={{ ...s.barFill, width: `${barW}%`, background: color }} />
+              <div style={{ ...s.barLabel, fontWeight: isMine ? 700 : 400, color: isMine ? '#111827' : '#6b7280' }}>{label}</div>
+              <div style={s.divergeTrack}>
+                {/* 0 기준선 */}
+                <div style={{ position: 'absolute', left: '50%', top: 0, height: '100%', width: 1, background: '#d1d5db', zIndex: 1 }} />
+                {/* 바 */}
+                <div style={{
+                  position: 'absolute', top: 0, height: '100%',
+                  ...(isPos
+                    ? { left: '50%', width: `${halfW}%`, borderRadius: '0 3px 3px 0' }
+                    : { right: '50%', width: `${halfW}%`, borderRadius: '3px 0 0 3px' }
+                  ),
+                  background: color,
+                  opacity: isMine ? 1 : 0.55,
+                  transition: 'width 0.5s ease',
+                }} />
               </div>
-              <div style={{ ...s.barValue, color: isMine ? rateColor(val) : '#9ca3af' }}>
-                {pct(result[key])}
+              <div style={{ ...s.barValue, color, opacity: isMine ? 1 : 0.8 }}>
+                {pct(value)}
               </div>
             </div>
           )
         })}
       </div>
 
-      {/* 투자 성향 텍스트 */}
-      {result.mdd != null && (
+      {/* 투자 성향 유형 */}
+      {tendencies.length > 0 && (
         <div style={s.card}>
-          <div style={s.sectionLabel}>당신의 투자 스타일</div>
-          {behaviorText.map((line, i) => (
-            <p key={i} style={s.behaviorLine}>• {line}</p>
-          ))}
+          <div style={s.sectionLabel}>투자 성향</div>
+          <div style={s.tendencyBadges}>
+            {tendencies.map(t => (
+              <span key={t.label} style={{ ...s.tendencyBadge, background: t.bg, color: t.color, border: `1px solid ${t.color}40` }}>
+                {t.label}
+              </span>
+            ))}
+          </div>
+          <div style={{ marginTop: 12 }}>
+            {getTendencyLines(result, days).map((line, i) => (
+              <p key={i} style={s.behaviorLine}>• {line}</p>
+            ))}
+          </div>
         </div>
       )}
 
@@ -134,7 +158,7 @@ export default function ResultPage() {
         </div>
       )}
 
-      {/* 부가 정보 */}
+      {/* 투자 행동 수치 */}
       <div style={s.card}>
         <div style={s.sectionLabel}>투자 행동 분석</div>
         <InfoRow label="최대 낙폭 (MDD)"
@@ -148,7 +172,6 @@ export default function ResultPage() {
         <InfoRow label="플레이 기간"   value={`${days}일`} last />
       </div>
 
-      {/* 버튼 */}
       <button style={s.replayBtn} onClick={() => navigate('/setup')}>
         다시 하기
       </button>
@@ -157,12 +180,55 @@ export default function ResultPage() {
   )
 }
 
-function getBehaviorText(result) {
-  const mdd         = Number(result.mdd ?? 0)
-  const cashRatio   = Number(result.cashRatioAvg ?? 0)
-  const tradeCount  = result.tradeCount ?? 0
-  const days        = Math.round((new Date(result.endDate) - new Date(result.startDate)) / 86400000)
-  const tradesPerWeek = tradeCount / (days / 7)
+function buildCompareItems(result) {
+  const items = []
+
+  // 내 수익률 (고정 맨 위)
+  items.push({ key: 'me', label: '내 수익률', value: Number(result.myReturn ?? 0), isMine: true })
+
+  // NASDAQ
+  items.push({ key: 'nasdaq', label: 'NASDAQ', value: Number(result.nasdaqReturn ?? 0) })
+
+  // 구분선
+  items.push({ key: '__divider__', isDivider: true })
+
+  // M7 종목별 (이미 수익률 내림차순 정렬돼서 옴)
+  const stocks = result.stockReturns ?? []
+  stocks.forEach(st => {
+    items.push({ key: st.ticker, label: st.ticker, value: Number(st.returnRate ?? 0) })
+  })
+
+  return items
+}
+
+function getTendencies(result, days) {
+  const mdd          = Number(result.mdd ?? 0)
+  const cashRatio    = Number(result.cashRatioAvg ?? 0)
+  const tradeCount   = result.tradeCount ?? 0
+  const tradesPerWeek = tradeCount / Math.max(days / 7, 1)
+
+  const badges = []
+
+  // 리스크 성향
+  if (mdd < 0.15)      badges.push({ label: '안정 추구형', bg: '#f0fdf4', color: '#16a34a' })
+  else if (mdd > 0.30) badges.push({ label: '고위험 감수형', bg: '#fff7ed', color: '#ea580c' })
+
+  // 현금 성향
+  if (cashRatio >= 0.50)     badges.push({ label: '현금 방어형', bg: '#eff6ff', color: '#2563eb' })
+  else if (cashRatio < 0.20) badges.push({ label: '공격 투자형', bg: '#fef2f2', color: '#dc2626' })
+
+  // 매매 스타일
+  if (tradesPerWeek >= 3)     badges.push({ label: '단타형', bg: '#fdf4ff', color: '#9333ea' })
+  else if (tradesPerWeek < 0.5) badges.push({ label: '장기 보유형', bg: '#f0fdfa', color: '#0d9488' })
+
+  return badges.slice(0, 3)
+}
+
+function getTendencyLines(result, days) {
+  const mdd          = Number(result.mdd ?? 0)
+  const cashRatio    = Number(result.cashRatioAvg ?? 0)
+  const tradeCount   = result.tradeCount ?? 0
+  const tradesPerWeek = tradeCount / Math.max(days / 7, 1)
 
   const lines = []
 
@@ -174,9 +240,9 @@ function getBehaviorText(result) {
   else if (cashRatio >= 0.35) lines.push('현금과 투자를 균형 있게 배분했습니다.')
   else                        lines.push('자산 대부분을 주식에 집중 투자했습니다.')
 
-  if (tradesPerWeek >= 3)       lines.push('잦은 매매로 시장 변동에 민감하게 반응했습니다.')
-  else if (tradesPerWeek >= 1)  lines.push('필요한 시점에만 선택적으로 거래했습니다.')
-  else                          lines.push('장기 보유 성향으로 거래를 최소화했습니다.')
+  if (tradesPerWeek >= 3)      lines.push('잦은 매매로 시장 변동에 민감하게 반응했습니다.')
+  else if (tradesPerWeek >= 1) lines.push('필요한 시점에만 선택적으로 거래했습니다.')
+  else                         lines.push('장기 보유 성향으로 거래를 최소화했습니다.')
 
   return lines
 }
@@ -193,6 +259,9 @@ function InfoRow({ label, value, color, last }) {
 const s = {
   root:         { minHeight: '100vh', background: '#f5f6f8', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 12 },
   center:       { color: '#9ca3af', textAlign: 'center', marginTop: 100, fontSize: 14 },
+  loadingWrap:  { minHeight: '100vh', background: '#f5f6f8', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 },
+  spinner:      { width: 36, height: 36, border: '3px solid #e5e7eb', borderTop: '3px solid #16a34a', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
+  loadingText:  { color: '#6b7280', fontSize: 14, fontWeight: 500 },
   header:       { marginBottom: 4 },
   headerTitle:  { color: '#111827', fontSize: 20, fontWeight: 700, letterSpacing: '-0.3px' },
   headerSub:    { color: '#6b7280', fontSize: 12, marginTop: 4 },
@@ -214,21 +283,24 @@ const s = {
   card:         { background: '#fff', borderRadius: 12, padding: '16px', border: '1px solid #e8eaed' },
   sectionLabel: { color: '#9ca3af', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
 
-  barRow:       { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 },
-  barLabel:     { color: '#6b7280', fontSize: 12, width: 60, flexShrink: 0 },
-  barTrack:     { flex: 1, height: 8, background: '#f3f4f6', borderRadius: 4, overflow: 'hidden' },
-  barFill:      { height: '100%', borderRadius: 4, transition: 'width 0.6s ease' },
-  barValue:     { fontSize: 13, fontWeight: 600, width: 60, textAlign: 'right', flexShrink: 0 },
+  barRow:       { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 },
+  barLabel:     { color: '#6b7280', fontSize: 12, width: 58, flexShrink: 0 },
+  divergeTrack: { flex: 1, height: 8, position: 'relative', background: '#f3f4f6', borderRadius: 4, overflow: 'hidden' },
+  barValue:     { fontSize: 12, fontWeight: 600, width: 56, textAlign: 'right', flexShrink: 0 },
 
-  infoRow:      { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f3f4f6' },
-  infoLabel:    { color: '#6b7280', fontSize: 13 },
-  infoValue:    { color: '#374151', fontSize: 13, fontWeight: 500 },
+  dividerRow:   { display: 'flex', alignItems: 'center', gap: 8, margin: '6px 0' },
+  dividerLine:  { flex: 1, height: 1, background: '#f3f4f6' },
+  dividerLabel: { color: '#d1d5db', fontSize: 10, whiteSpace: 'nowrap' },
 
-  replayBtn:    { background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, padding: '14px', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginTop: 4 },
-  behaviorLine: { color: '#374151', fontSize: 13, lineHeight: 1.7, margin: '4px 0' },
+  tendencyBadges: { display: 'flex', flexWrap: 'wrap', gap: 8 },
+  tendencyBadge:  { fontSize: 12, fontWeight: 700, padding: '5px 12px', borderRadius: 20 },
+  behaviorLine:   { color: '#6b7280', fontSize: 12, lineHeight: 1.7, margin: '3px 0' },
+
   themeRow:     { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 },
   themeLabel:   { color: '#6b7280', fontSize: 12, width: 110, flexShrink: 0 },
   themeTrack:   { flex: 1, height: 6, background: '#f3f4f6', borderRadius: 3, overflow: 'hidden' },
   themeFill:    { height: '100%', background: '#6366f1', borderRadius: 3 },
   themeCount:   { color: '#9ca3af', fontSize: 11, width: 28, textAlign: 'right', flexShrink: 0 },
+
+  replayBtn:    { background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, padding: '14px', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginTop: 4 },
 }

@@ -146,7 +146,7 @@ public class DataController {
                       "minimum_should_match": 1
                     }
                   },
-                  "_source": ["title", "title_ko", "summary", "category", "source", "url", "date", "published_at", "importance", "themes"],
+                  "_source": ["title", "title_ko", "brief", "summary", "category", "source_type", "tickers", "source", "url", "date", "published_at", "importance", "themes"],
                   "size": 150,
                   "sort": [{ "published_at": { "order": "asc" } }]
                 }
@@ -170,13 +170,18 @@ public class DataController {
                     Map<String, Object> src = (Map<String, Object>) hit.get("_source");
                     Object imp = src.get("importance");
                     @SuppressWarnings("unchecked")
-                    List<String> themes = (List<String>) src.get("themes");
+                    List<String> themes  = (List<String>) src.get("themes");
+                    @SuppressWarnings("unchecked")
+                    List<String> tickers = (List<String>) src.get("tickers");
                     return new NewsArticleResponse(
                             (String) hit.get("_id"),
                             (String) src.get("title"),
                             (String) src.get("title_ko"),
+                            (String) src.get("brief"),
                             (String) src.get("summary"),
                             (String) src.get("category"),
+                            (String) src.get("source_type"),
+                            tickers != null ? tickers : List.of(),
                             (String) src.get("source"),
                             (String) src.get("url"),
                             (String) src.get("date"),

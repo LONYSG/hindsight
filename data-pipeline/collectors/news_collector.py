@@ -77,15 +77,23 @@ _SELECTION_PROMPT = """\
 * 지나치게 지역적인 사회 이슈
 * 시장 및 산업 영향이 거의 없는 단순 화제성 기사
 
-[중요도 점수 기준]
+[투자 참고 가치 점수 기준]
 
-각 뉴스에 대해 당시 기준 투자 중요도를 1~5점으로 평가하세요.
-기준은 "당시 투자자가 일반적으로 얼마나 중요하게 받아들였을 가능성이 있는가"입니다.
+각 뉴스에 대해 투자 참고 가치를 1~5점으로 평가하세요.
+기준은 "당시 미국 투자자 관점에서 투자 판단에 참고할 가치가 얼마나 있는가"입니다.
 
-5 = 시장 전체 또는 핵심 산업에 매우 큰 영향을 주는 이벤트
-4 = 주요 기업/산업 흐름에 중요한 뉴스
-3 = 투자자가 참고할 가치가 높은 뉴스
-2 = 특정 산업·기업·거시 흐름에 제한적으로 관련 있는 뉴스
+이 점수는 "시장 충격도"가 아닌 "투자자가 참고할 이유가 있는가"를 측정합니다.
+FOMC·CPI 같은 대형 이벤트뿐 아니라, 공급망 변화·AI 투자 확대·기업 전략 변화처럼
+당장은 조용하지만 투자 판단에 의미 있는 뉴스도 높은 점수를 받을 수 있습니다.
+단순 화제성이나 클릭 유도성 헤드라인은 낮게 평가하세요.
+
+이 점수는 향후 주가 상승 여부를 예측하는 것이 아닙니다.
+당시 투자자가 판단 과정에서 참고할 가능성이 있었는지를 기준으로 평가하세요.
+
+5 = 대부분의 투자자가 반드시 참고해야 할 수준의 뉴스
+4 = 특정 산업·기업 투자자에게 매우 중요한 뉴스
+3 = 투자 판단에 충분히 참고 가치가 있는 뉴스
+2 = 제한적이지만 일부 투자자에게 의미 있을 수 있는 뉴스
 1 = 미국 투자자 관점에서 참고 가치가 거의 없는 뉴스
 
 [선별 원칙]
@@ -101,8 +109,8 @@ _SELECTION_PROMPT = """\
 {headlines}
 
 응답 형식 (반드시 준수):
-선택한 기사 번호와 중요도를 한 줄씩, 파이프(|)로 구분하여 출력하세요.
-중요도 2점 이상인 기사만 포함하세요.
+선택한 기사 번호와 relevance score를 한 줄씩, 파이프(|)로 구분하여 출력하세요.
+relevance score 2점 이상인 기사만 포함하세요.
 
 예시:
 3|5
@@ -110,8 +118,8 @@ _SELECTION_PROMPT = """\
 12|3
 18|2"""
 
-# 선별 최소 중요도 (이 이상인 기사만 저장)
-_SELECTION_MIN_SCORE = 2
+# 선별 최소 relevance score (이 이상인 기사만 저장)
+_SELECTION_MIN_RELEVANCE = 2
 
 # 무료 티어: 분당 15회 호출 → 호출 간 최소 4초
 _GEMINI_FREE_TIER_SLEEP = 4.5
@@ -129,7 +137,7 @@ _VALID_THEMES = {
 _SUMMARY_PROMPT = """\
 당신은 글로벌 금융 뉴스 분석 시스템입니다.
 
-아래 뉴스 기사를 읽고 세 가지를 생성하세요.
+아래 뉴스 기사를 읽고 네 가지를 생성하세요.
 반드시 순수 JSON만 출력하세요. markdown / code block / 설명 문장 일절 금지.
 
 [title_ko]
@@ -139,7 +147,15 @@ _SUMMARY_PROMPT = """\
 - 숫자·비율·금액 정보 가능하면 유지
 - 한 줄로 작성
 
+[brief]
+- 이 기사의 핵심 내용을 한 문장으로 요약
+- 제목만 읽은 투자자가 즉시 핵심 맥락을 파악할 수 있어야 함
+- 팩트·수치 중심. 해석·전망·투자 의견 금지
+- 좋은 예: "중국 공장 가동 중단으로 아이폰 공급량이 15% 감소할 것으로 예상됐다"
+- 나쁜 예: "애플에 악재로 작용할 전망이다"
+
 [summary]
+- 첫 문장은 기사의 핵심 내용을 가장 압축적으로 전달하세요
 - 한국어 요약 본문만 출력 (제목·레이블·불릿·번호 목록 금지)
 - markdown 사용 금지
 - 자연스러운 뉴스 기사 요약 형태로 작성
@@ -195,7 +211,7 @@ OTHER
 간접적으로 연관된 theme는 포함하지 마세요.
 
 출력 형식 (이 외의 텍스트 일절 금지):
-{{"title_ko": "...", "summary": "...", "themes": ["THEME1", "THEME2"]}}
+{{"title_ko": "...", "brief": "...", "summary": "...", "themes": ["THEME1", "THEME2"]}}
 
 날짜: {date}
 출처: {source}
@@ -275,6 +291,7 @@ def summarize_pending(batch_size: int = 50):
             r = _summarize(model, hit["_source"])
             es.update(index=_ES_INDEX, id=hit["_id"], body={"doc": {
                 "title_ko": r["title_ko"],
+                "brief":    r["brief"],
                 "summary":  r["summary"],
                 "themes":   r["themes"],
                 "llm_raw":  r["llm_raw"],
@@ -302,7 +319,7 @@ def reset_index():
 def re_summarize_all(batch_size: int = 50):
     """
     프롬프트 개선 후 전체 재요약.
-    기존 summary/title_ko 를 새 프롬프트로 덮어쓴다.
+    brief 필드가 없는 기사만 처리 → 중단 후 재실행해도 이어서 진행 가능.
     하루 500회 무료 쿼터 → 약 500건/일 처리 가능.
     """
     es = _get_es_client()
@@ -314,7 +331,7 @@ def re_summarize_all(batch_size: int = 50):
     while True:
         resp = es.search(
             index=_ES_INDEX,
-            query={"match_all": {}},
+            query={"bool": {"must_not": {"exists": {"field": "brief"}}}},
             _source=["title", "date", "source", "body"],
             size=batch_size,
             from_=page * batch_size,
@@ -330,6 +347,7 @@ def re_summarize_all(batch_size: int = 50):
             r = _summarize(model, src)
             es.update(index=_ES_INDEX, id=hit["_id"], body={"doc": {
                 "title_ko": r["title_ko"],
+                "brief":    r["brief"],
                 "summary":  r["summary"],
                 "themes":   r["themes"],
                 "llm_raw":  r["llm_raw"],
@@ -340,6 +358,71 @@ def re_summarize_all(batch_size: int = 50):
         print(f"[re_summarize_all] {total}건 완료...")
 
     print(f"[re_summarize_all] 전체 완료. 총 {total}건")
+    print_token_stats()
+
+
+def re_score_all():
+    """
+    기존 수집된 기사의 투자 참고 가치 점수(importance) 재평가.
+    변경된 _SELECTION_PROMPT 기준으로 날짜별 재점수화.
+    하루치 = Gemini 1회 호출 → 29일 기준 ~30초 소요, 비용 미미.
+    """
+    es = _get_es_client()
+    genai.configure(api_key=settings.GEMINI_API_KEY)
+    model = genai.GenerativeModel(settings.GEMINI_MODEL)
+
+    resp = es.search(
+        index=_ES_INDEX,
+        aggs={"dates": {"terms": {"field": "date", "size": 1000}}},
+        size=0,
+    )
+    dates = sorted([b["key"] for b in resp["aggregations"]["dates"]["buckets"]])
+
+    total = 0
+    for day_str in dates:
+        day_resp = es.search(
+            index=_ES_INDEX,
+            query={"term": {"date": day_str}},
+            _source=["title", "category"],
+            size=200,
+        )
+        hits = day_resp["hits"]["hits"]
+        if not hits:
+            continue
+
+        articles = [{"title": h["_source"]["title"], "category": h["_source"]["category"], "_id": h["_id"]} for h in hits]
+        headlines = "\n".join(f"{i+1}. [{a['category']}] {a['title']}" for i, a in enumerate(articles))
+        prompt = _SELECTION_PROMPT.format(date=day_str, headlines=headlines)
+
+        try:
+            result = model.generate_content(prompt)
+            _log_tokens(result.usage_metadata)
+
+            score_map = {}
+            for line in result.text.strip().split("\n"):
+                line = line.strip()
+                if "|" not in line:
+                    continue
+                parts = line.split("|")
+                if len(parts) != 2 or not parts[0].strip().isdigit() or not parts[1].strip().isdigit():
+                    continue
+                idx = int(parts[0].strip()) - 1
+                score = int(parts[1].strip())
+                if 0 <= idx < len(articles):
+                    score_map[articles[idx]["_id"]] = score
+
+            for art in articles:
+                new_score = score_map.get(art["_id"], 1)
+                es.update(index=_ES_INDEX, id=art["_id"], body={"doc": {"importance": new_score}})
+                total += 1
+
+            time.sleep(_GEMINI_FREE_TIER_SLEEP)
+            print(f"  [{day_str}] {len(articles)}건 재점수화 완료")
+
+        except Exception as e:
+            print(f"  [{day_str}] 재점수화 오류: {e}")
+
+    print(f"[re_score_all] 완료. 총 {total}건")
     print_token_stats()
 
 
@@ -379,6 +462,7 @@ def _collect_base(es: Elasticsearch, start_date: str, end_date: str, model, summ
             for a in new_articles:
                 r = _summarize(model, a)
                 a["title_ko"] = r["title_ko"]
+                a["brief"]    = r["brief"]
                 a["summary"]  = r["summary"]
                 a["themes"]   = r["themes"]
                 a["llm_raw"]  = r["llm_raw"]
@@ -452,7 +536,7 @@ def _select_with_gemini(model, articles: list[dict], day: str) -> list[dict]:
                 continue
             idx   = int(num_str) - 1
             score = int(score_str)
-            if 0 <= idx < len(articles) and score >= _SELECTION_MIN_SCORE:
+            if 0 <= idx < len(articles) and score >= _SELECTION_MIN_RELEVANCE:
                 article = articles[idx].copy()
                 article["importance"] = score
                 selected.append(article)
@@ -473,10 +557,10 @@ def _select_with_gemini(model, articles: list[dict], day: str) -> list[dict]:
 
 def _summarize(model, article: dict) -> dict:
     """
-    JSON 단일 호출로 title_ko + summary + themes 생성.
-    반환: {"title_ko": str, "summary": str, "themes": list, "llm_raw": str}
+    JSON 단일 호출로 title_ko + brief + summary + themes 생성.
+    반환: {"title_ko": str, "brief": str, "summary": str, "themes": list, "llm_raw": str}
     """
-    _empty = {"title_ko": "", "summary": "", "themes": ["OTHER"], "llm_raw": ""}
+    _empty = {"title_ko": "", "brief": "", "summary": "", "themes": ["OTHER"], "llm_raw": ""}
     if not article.get("body"):
         return _empty
 
@@ -495,6 +579,7 @@ def _summarize(model, article: dict) -> dict:
         parsed = json.loads(clean)
 
         title_ko = parsed.get("title_ko", "").strip()
+        brief    = parsed.get("brief", "").strip()
         summary  = parsed.get("summary", "").strip()
         themes   = [
             t for t in parsed.get("themes", [])
@@ -503,7 +588,7 @@ def _summarize(model, article: dict) -> dict:
         if not themes:
             themes = ["OTHER"]
 
-        return {"title_ko": title_ko, "summary": summary, "themes": themes, "llm_raw": raw}
+        return {"title_ko": title_ko, "brief": brief, "summary": summary, "themes": themes, "llm_raw": raw}
 
     except Exception as e:
         print(f"  요약 오류 ({article.get('title', '')[:40]}): {e}")
@@ -548,6 +633,7 @@ def _ensure_index(es: Elasticsearch):
                     "title_ko":     {"type": "text"},
                     "url":          {"type": "keyword"},
                     "body":         {"type": "text", "analyzer": "english"},
+                    "brief":        {"type": "text"},
                     "summary":      {"type": "text"},
                     "importance":   {"type": "integer"},
                     "themes":       {"type": "keyword"},

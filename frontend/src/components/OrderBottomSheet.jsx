@@ -92,33 +92,50 @@ export default function OrderBottomSheet({ company, price, portfolio, holdings, 
           <span style={s.availValue}>{tab === 'BUY' ? maxBuy : maxSell}주</span>
         </div>
 
-        {/* 수량 직접 입력 */}
-        <div style={s.qtyRow}>
-          <button style={s.qtyBtn} onClick={() => changeQty(qty - 1)}>−</button>
-          <input
-            style={s.qtyInput}
-            type="number" min={1} max={maxQty} value={qty}
-            onChange={(e) => changeQty(Number(e.target.value))}
-          />
-          <button style={s.qtyBtn} onClick={() => changeQty(qty + 1)}>+</button>
-        </div>
+        {/* 잔액/보유 부족 경고 — 체결 직후엔 억제 */}
+        {!msg && tab === 'BUY' && maxBuy === 0 && (
+          <div style={s.warnBox}>💰 1주 매수 금액이 부족합니다</div>
+        )}
+        {!msg && tab === 'SELL' && maxSell === 0 && (
+          <div style={s.warnBox}>📭 보유 중인 주식이 없습니다</div>
+        )}
 
-        {/* 비중 빠른 선택 */}
-        <div style={s.pctRow}>
-          {[10, 25, 50, 100].map(p => (
-            <button key={p}
-              style={{ ...s.pctBtn, ...(pct === p ? { borderColor: tab === 'BUY' ? upColor : dnColor, color: tab === 'BUY' ? upColor : dnColor } : {}) }}
-              onClick={() => applyPct(p)}>
-              {p}%
-            </button>
-          ))}
-        </div>
+        {/* 수량 입력 + 비중 선택 (가능할 때만) */}
+        {maxQty > 0 && (
+          <>
+            <div style={s.qtyRow}>
+              <button style={s.qtyBtn} onMouseDown={e => e.preventDefault()} onClick={() => changeQty(qty - 1)}>−</button>
+              <input
+                style={s.qtyInput}
+                type="number" min={1} max={maxQty} value={qty}
+                onChange={(e) => changeQty(Number(e.target.value))}
+              />
+              <button style={s.qtyBtn} onMouseDown={e => e.preventDefault()} onClick={() => changeQty(qty + 1)}>+</button>
+            </div>
+            <div style={s.pctRow}>
+              {[10, 25, 50, 100].map(p => (
+                <button key={p}
+                  style={{ ...s.pctBtn, borderColor: pct === p ? (tab === 'BUY' ? upColor : dnColor) : '#e5e7eb', color: pct === p ? (tab === 'BUY' ? upColor : dnColor) : '#9ca3af' }}
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => applyPct(p)}>
+                  {p}%
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* 주문 정보 */}
-        <div style={s.orderInfo}>
-          <Row label="주문금액"    value={fmt(orderAmt)} bold />
-          <Row label="주문 후 예수금" value={fmt(afterCash)} dim />
-        </div>
+        {maxQty > 0 && (
+          <div style={s.orderInfo}>
+            <Row label="주문금액"    value={fmt(orderAmt)} bold />
+            <Row label="주문 후 예수금"
+              value={afterCash < 0 ? '잔액 부족' : fmt(afterCash)}
+              dim={afterCash >= 0}
+              warn={afterCash < 0}
+            />
+          </div>
+        )}
 
         {/* 주문 버튼 */}
         <button
@@ -138,11 +155,11 @@ export default function OrderBottomSheet({ company, price, portfolio, holdings, 
   )
 }
 
-function Row({ label, value, bold, dim }) {
+function Row({ label, value, bold, dim, warn }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #f3f4f6' }}>
       <span style={{ color: '#6b7280', fontSize: 13 }}>{label}</span>
-      <span style={{ color: dim ? '#6b7280' : bold ? '#111827' : '#6b7280', fontSize: 13, fontWeight: bold ? 700 : 500 }}>{value}</span>
+      <span style={{ color: warn ? '#ef4444' : dim ? '#6b7280' : bold ? '#111827' : '#6b7280', fontSize: 13, fontWeight: bold || warn ? 700 : 500 }}>{value}</span>
     </div>
   )
 }
@@ -165,7 +182,8 @@ const s = {
   qtyBtn:      { width: 38, height: 38, background: '#f5f6f8', border: '1px solid #e5e7eb', borderRadius: 8, color: '#374151', fontSize: 20, cursor: 'pointer', flexShrink: 0 },
   qtyInput:    { flex: 1, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, color: '#111827', fontSize: 18, fontWeight: 700, textAlign: 'center', padding: '7px 0' },
   pctRow:      { display: 'flex', gap: 8, marginBottom: 16 },
-  pctBtn:      { flex: 1, background: '#f5f6f8', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 0', color: '#6b7280', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  pctBtn:      { flex: 1, background: '#f5f6f8', borderWidth: 1, borderStyle: 'solid', borderColor: '#e5e7eb', borderRadius: 8, padding: '8px 0', color: '#6b7280', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
   orderInfo:   { marginBottom: 16 },
   orderBtn:    { width: '100%', border: 'none', borderRadius: 10, padding: '14px', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' },
+  warnBox:     { background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#ef4444', fontWeight: 600, textAlign: 'center', marginBottom: 12 },
 }

@@ -2,6 +2,7 @@ package com.hindsight.result.service;
 
 import com.hindsight.auth.repository.UserRepository;
 import com.hindsight.data.entity.DailyMacro;
+import com.hindsight.data.repository.CompanyRepository;
 import com.hindsight.data.repository.DailyMacroRepository;
 import com.hindsight.data.repository.DailyPriceRepository;
 import com.hindsight.global.exception.ResourceNotFoundException;
@@ -18,7 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +35,7 @@ public class ResultService {
     private final TradeHistoryRepository tradeHistoryRepository;
     private final DailyPriceRepository dailyPriceRepository;
     private final DailyMacroRepository dailyMacroRepository;
+    private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
 
     @Transactional
@@ -45,42 +51,36 @@ public class ResultService {
         var startDate = session.getStartPoint().getStartDate();
         var endDate   = session.getSimDate();
 
-        // 시작일 거시지표
         DailyMacro startMacro = dailyMacroRepository
                 .findFirstByDateGreaterThanEqualOrderByDateAsc(startDate)
                 .orElseThrow(() -> new ResourceNotFoundException("시작일 거시지표 없음"));
 
-        // 종료일 거시지표
         DailyMacro endMacro = dailyMacroRepository
                 .findByDate(endDate)
                 .or(() -> dailyMacroRepository.findFirstByDateGreaterThanEqualOrderByDateAsc(endDate))
                 .orElseThrow(() -> new ResourceNotFoundException("종료일 거시지표 없음"));
 
-        // 최종 포트폴리오
         var snapshot = portfolioSnapshotRepository
                 .findTopBySessionIdOrderByDateDesc(sessionId)
                 .orElseThrow();
 
-        BigDecimal finalValue = snapshot.getTotalValue();
-        BigDecimal seedMoney  = session.getSeedMoney();
-
+        BigDecimal finalValue   = snapshot.getTotalValue();
+        BigDecimal seedMoney    = session.getSeedMoney();
         BigDecimal myReturn     = rate(finalValue, seedMoney);
-        BigDecimal sp500Return  = rate(endMacro.getSp500(), startMacro.getSp500());
         BigDecimal nasdaqReturn = rate(endMacro.getNasdaq(), startMacro.getNasdaq());
-        BigDecimal alpha        = myReturn.subtract(sp500Return).setScale(6, RoundingMode.HALF_UP);
+        BigDecimal sp500Return  = rate(endMacro.getSp500(), startMacro.getSp500());
+        BigDecimal alpha        = myReturn.subtract(nasdaqReturn).setScale(6, RoundingMode.HALF_UP);
 
         int tradeCount = (int) tradeHistoryRepository.countBySessionId(sessionId);
 
-        // MDD + 평균 현금 비율 계산
-        var snapshots = portfolioSnapshotRepository.findBySessionIdOrderByDateAsc(sessionId);
+        var snapshots   = portfolioSnapshotRepository.findBySessionIdOrderByDateAsc(sessionId);
         BigDecimal mdd          = calcMdd(snapshots, seedMoney);
         BigDecimal cashRatioAvg = calcCashRatioAvg(snapshots);
 
-        // 결과 저장
         PlayResult result = PlayResult.builder()
                 .session(session)
                 .myReturn(myReturn)
-                .stockReturn(null)   // 멀티 포트폴리오 - 단일 종목 수익률 미사용
+                .stockReturn(null)
                 .sp500Return(sp500Return)
                 .nasdaqReturn(nasdaqReturn)
                 .alpha(alpha)
@@ -90,7 +90,6 @@ public class ResultService {
                 .build();
         playResultRepository.save(result);
 
-        // 세션 상태 종료
         session.finish();
         playSessionRepository.save(session);
 
@@ -112,21 +111,41 @@ public class ResultService {
                 ? result.getTradeCount()
                 : (int) tradeHistoryRepository.countBySessionId(session.getId());
 
+        LocalDate startDate = session.getStartPoint().getStartDate();
+        LocalDate endDate   = session.getSimDate();
+
         return new PlayResultResponse(
                 session.getId(),
-                session.getStartPoint().getStartDate(),
-                session.getSimDate(),
+                startDate,
+                endDate,
                 session.getSeedMoney(),
                 snapshot.getTotalValue(),
                 result.getMyReturn(),
-                result.getStockReturn(),
-                result.getSp500Return(),
                 result.getNasdaqReturn(),
                 result.getAlpha(),
                 tradeCount,
                 result.getMdd(),
-                result.getCashRatioAvg()
+                result.getCashRatioAvg(),
+                calcStockReturns(startDate, endDate)
         );
+    }
+
+    private List<PlayResultResponse.StockReturn> calcStockReturns(LocalDate startDate, LocalDate endDate) {
+        return companyRepository.findAll().stream()
+                .map(company -> {
+                    var startPrice = dailyPriceRepository
+                            .findFirstByCompanyIdAndDateGreaterThanEqualOrderByDateAsc(company.getId(), startDate);
+                    var endPrice = dailyPriceRepository
+                            .findFirstByCompanyIdAndDateLessThanOrderByDateDesc(company.getId(), endDate.plusDays(1));
+
+                    if (startPrice.isEmpty() || endPrice.isEmpty()) return null;
+
+                    BigDecimal ret = rate(endPrice.get().getClose(), startPrice.get().getClose());
+                    return new PlayResultResponse.StockReturn(company.getTicker(), ret);
+                })
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(PlayResultResponse.StockReturn::returnRate).reversed())
+                .collect(Collectors.toList());
     }
 
     private BigDecimal calcMdd(List<com.hindsight.play.entity.PortfolioSnapshot> snapshots, BigDecimal seedMoney) {

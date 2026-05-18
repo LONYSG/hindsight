@@ -2,6 +2,7 @@ package com.hindsight.result.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 public record PlayResultResponse(
         Long sessionId,
@@ -9,12 +10,13 @@ public record PlayResultResponse(
         LocalDate endDate,
         BigDecimal seedMoney,
         BigDecimal finalValue,
-        BigDecimal myReturn,       // 내 수익률
-        BigDecimal stockReturn,    // NVDA 수익률
-        BigDecimal sp500Return,    // S&P500 수익률
-        BigDecimal nasdaqReturn,   // NASDAQ 수익률
-        BigDecimal alpha,          // 알파 (내 수익률 - S&P500)
-        int tradeCount,            // 총 거래 횟수
-        BigDecimal mdd,            // 최대 낙폭 (0.18 = -18%)
-        BigDecimal cashRatioAvg    // 평균 현금 비율 (0.4 = 40%)
-) {}
+        BigDecimal myReturn,
+        BigDecimal nasdaqReturn,
+        BigDecimal alpha,          // vs NASDAQ
+        int tradeCount,
+        BigDecimal mdd,
+        BigDecimal cashRatioAvg,
+        List<StockReturn> stockReturns
+) {
+    public record StockReturn(String ticker, BigDecimal returnRate) {}
+}

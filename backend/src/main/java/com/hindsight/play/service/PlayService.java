@@ -94,28 +94,42 @@ public class PlayService {
 
         session.advanceDate(nextTradingDay);
 
-        // 보유 종목별 평가금액 재계산
         List<Long> heldCompanyIds = tradeHistoryRepository.findHeldCompanyIds(sessionId);
-        BigDecimal totalStockValue = BigDecimal.ZERO;
-        for (Long companyId : heldCompanyIds) {
-            int qty = tradeHistoryRepository.calculateHeldQuantity(sessionId, companyId);
-            BigDecimal price = dailyPriceRepository
-                    .findByCompanyIdAndDate(companyId, nextTradingDay)
-                    .map(DailyPrice::getClose)
-                    .orElse(BigDecimal.ZERO);
-            totalStockValue = totalStockValue.add(price.multiply(BigDecimal.valueOf(qty)));
-        }
 
         PortfolioSnapshot prev = portfolioSnapshotRepository
                 .findTopBySessionIdOrderByDateDesc(sessionId)
                 .orElseThrow(() -> new IllegalStateException("포트폴리오 스냅샷이 없습니다."));
+        BigDecimal cash = prev.getCash();
 
-        portfolioSnapshotRepository.save(PortfolioSnapshot.builder()
-                .session(session)
-                .date(nextTradingDay)
-                .cash(prev.getCash())
-                .stockValue(totalStockValue)
-                .build());
+        // 점프 구간의 모든 거래일 스냅샷 저장 — MDD 계산 정확도 보장
+        LocalDate cursor = prev.getDate().plusDays(1);
+        List<PortfolioSnapshot> snapshots = new ArrayList<>();
+        while (!cursor.isAfter(nextTradingDay)) {
+            BigDecimal stockValue = BigDecimal.ZERO;
+            for (Long companyId : heldCompanyIds) {
+                int qty = tradeHistoryRepository.calculateHeldQuantity(sessionId, companyId);
+                BigDecimal price = dailyPriceRepository
+                        .findByCompanyIdAndDate(companyId, cursor)
+                        .map(DailyPrice::getClose)
+                        .orElse(null);
+                if (price != null) {
+                    stockValue = stockValue.add(price.multiply(BigDecimal.valueOf(qty)));
+                }
+            }
+            // 해당 날짜 주가 데이터가 있는 거래일만 저장
+            boolean isTradingDay = heldCompanyIds.isEmpty() ||
+                    dailyPriceRepository.findByCompanyIdAndDate(REFERENCE_COMPANY_ID, cursor).isPresent();
+            if (isTradingDay || cursor.equals(nextTradingDay)) {
+                snapshots.add(PortfolioSnapshot.builder()
+                        .session(session)
+                        .date(cursor)
+                        .cash(cash)
+                        .stockValue(stockValue)
+                        .build());
+            }
+            cursor = cursor.plusDays(1);
+        }
+        portfolioSnapshotRepository.saveAll(snapshots);
 
         return buildState(session);
     }

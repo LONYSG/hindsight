@@ -49,7 +49,7 @@ def _fetch_from_tiingo(ticker: str, start: str, end: str) -> pd.DataFrame:
     }
     params = {"startDate": start, "endDate": end}
 
-    resp = requests.get(url, headers=headers, params=params, timeout=120)
+    resp = requests.get(url, headers=headers, params=params, timeout=120, verify=False)
     resp.raise_for_status()
     data = resp.json()
 

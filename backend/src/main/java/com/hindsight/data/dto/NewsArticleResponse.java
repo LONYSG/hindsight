@@ -3,15 +3,18 @@ package com.hindsight.data.dto;
 import java.util.List;
 
 public record NewsArticleResponse(
-        String id,          // ES _id (news_view 이벤트 기록용)
-        String title,       // 영문 원제
-        String titleKo,     // 한국어 제목
+        String id,
+        String title,
+        String titleKo,
+        String brief,          // 한 줄 핵심 요약 (카드 collapsed 상태 preview)
         String summary,
         String category,
+        String sourceType,     // "company" | null (Guardian = null)
+        List<String> tickers,  // 관련 종목 ["NVDA"] — company 뉴스만
         String source,
         String url,
         String date,
         String publishedAt,
-        Integer importance, // 당시 투자자 중요도 1~5
-        List<String> themes // 투자 테마 태그
+        Integer importance,
+        List<String> themes
 ) {}

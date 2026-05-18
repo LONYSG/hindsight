@@ -30,6 +30,12 @@ KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 # The Guardian API
 GUARDIAN_API_KEY = os.environ["GUARDIAN_API_KEY"]
 
+# Finnhub API (ticker 기반 기업 뉴스)
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
+
+# Alpha Vantage API (ticker 기반 기업 뉴스 + 감성 분석)
+ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY", "")
+
 # NYT API
 NYT_API_KEY = os.environ["NYT_API_KEY"]
 

@@ -340,7 +340,11 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
           const held  = holdings.some(h => h.companyId === c.id)
           return (
             <button key={c.id}
-              style={{ ...s.chip, ...(isSel ? s.chipActive : {}), ...(held && !isSel ? s.chipHeld : {}) }}
+              style={{ ...s.chip,
+                borderColor: isSel ? '#22c55e' : held ? '#fcd34d' : '#e5e7eb',
+                color:       isSel ? '#16a34a' : held ? '#92400e' : '#9ca3af',
+              }}
+              onMouseDown={e => e.preventDefault()}
               onClick={() => setSelected(c)}>
               {c.ticker}{held && <span style={s.dot} />}
             </button>
@@ -351,21 +355,21 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
       {/* 지표 토글 */}
       <div style={s.indRow}>
         <span style={s.group}>
-          <button style={{ ...s.ind, ...(showVol ? s.volOn : {}) }} onClick={toggleVol}>거래량</button>
+          <button style={{ ...s.ind, borderColor: showVol ? '#64748b' : '#e5e7eb', color: showVol ? '#475569' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleVol}>거래량</button>
         </span>
         <div style={s.sep} />
         <span style={s.group}>
           {[5, 20, 60].map(p => (
-            <button key={p} style={{ ...s.ind, ...(showMA[p] ? { borderColor: MA_COLORS[p] + 'bb', color: MA_COLORS[p] } : {}) }}
-              onClick={() => toggleMA(p)}>MA{p}</button>
+            <button key={p} style={{ ...s.ind, borderColor: showMA[p] ? MA_COLORS[p] + 'bb' : '#e5e7eb', color: showMA[p] ? MA_COLORS[p] : '#9ca3af' }}
+              onMouseDown={e => e.preventDefault()} onClick={() => toggleMA(p)}>MA{p}</button>
           ))}
-          <button style={{ ...s.ind, ...(showBB ? s.bbOn : {}) }} onClick={toggleBB}>BB</button>
-          <button style={{ ...s.ind, ...(showIchi ? s.ichiOn : {}) }} onClick={toggleIchi}>일목</button>
+          <button style={{ ...s.ind, borderColor: showBB ? '#8b5cf6' : '#e5e7eb', color: showBB ? '#7c3aed' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleBB}>BB</button>
+          <button style={{ ...s.ind, borderColor: showIchi ? '#d946ef' : '#e5e7eb', color: showIchi ? '#a21caf' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleIchi}>일목</button>
         </span>
         <div style={s.sep} />
         <span style={s.group}>
-          <button style={{ ...s.ind, ...(showRSI ? s.rsiOn : {}) }} onClick={toggleRSI}>RSI</button>
-          <button style={{ ...s.ind, ...(showMACD ? s.macdOn : {}) }} onClick={toggleMACD}>MACD</button>
+          <button style={{ ...s.ind, borderColor: showRSI ? '#a78bfa' : '#e5e7eb', color: showRSI ? '#7c3aed' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleRSI}>RSI</button>
+          <button style={{ ...s.ind, borderColor: showMACD ? '#60a5fa' : '#e5e7eb', color: showMACD ? '#2563eb' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleMACD}>MACD</button>
         </span>
       </div>
 
@@ -432,14 +436,14 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
 const s = {
   root:       { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', gap: 6 },
   companyRow: { display: 'flex', flexWrap: 'wrap', gap: 4, flexShrink: 0 },
-  chip:       { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', color: '#9ca3af', fontSize: 11, fontWeight: 700, cursor: 'pointer', position: 'relative' },
+  chip:       { background: '#fff', borderWidth: 1, borderStyle: 'solid', borderColor: '#e5e7eb', borderRadius: 6, padding: '4px 8px', color: '#9ca3af', fontSize: 11, fontWeight: 700, cursor: 'pointer', position: 'relative', outline: 'none' },
   chipActive: { borderColor: '#22c55e', color: '#16a34a' },
   chipHeld:   { borderColor: '#fcd34d', color: '#92400e' },
   dot:        { position: 'absolute', top: 2, right: 2, width: 4, height: 4, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' },
   indRow:     { display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 },
   group:      { display: 'flex', gap: 4 },
   sep:        { width: 1, height: 12, background: '#e5e7eb' },
-  ind:        { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 5, padding: '3px 7px', color: '#9ca3af', fontSize: 10, fontWeight: 700, cursor: 'pointer' },
+  ind:        { background: '#fff', borderWidth: 1, borderStyle: 'solid', borderColor: '#e5e7eb', borderRadius: 5, padding: '3px 7px', color: '#9ca3af', fontSize: 10, fontWeight: 700, cursor: 'pointer', outline: 'none' },
   volOn:      { borderColor: '#64748b', color: '#475569' },
   bbOn:       { borderColor: '#8b5cf6', color: '#7c3aed' },
   ichiOn:     { borderColor: '#d946ef', color: '#a21caf' },
@@ -449,6 +453,6 @@ const s = {
   panel:      { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, borderTop: '1px solid #e5e7eb' },
   panelHdr:   { display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0', fontSize: 10, flexShrink: 0 },
   tradeRow:   { display: 'flex', gap: 8, flexShrink: 0 },
-  buyBtn:     { flex: 1, background: '#f43f5e', border: 'none', borderRadius: 8, padding: '12px 0', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' },
-  sellBtn:    { flex: 1, background: '#3b82f6', border: 'none', borderRadius: 8, padding: '12px 0', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' },
+  buyBtn:     { flex: 1, background: '#f43f5e', border: 'none', borderRadius: 8, padding: '12px 0', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', outline: 'none' },
+  sellBtn:    { flex: 1, background: '#3b82f6', border: 'none', borderRadius: 8, padding: '12px 0', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', outline: 'none' },
 }
