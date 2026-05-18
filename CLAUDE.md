@@ -137,51 +137,54 @@ news_view (id, session_id, news_es_id VARCHAR, viewed_at TIMESTAMP)
 
 ## 뉴스 시스템 설계
 
-### 수집 구조 (Python - The Guardian API)
+### 수집 구조 (2계층)
 
 ```
+[레이어 1 - 글로벌 거시 뉴스]
 Guardian API (business/technology/world 섹션)
-        ↓
-Gemini - 헤드라인 선별 + importance 1~5점 부여
-        ↓
-Elasticsearch 저장 (importance, themes 포함)
-        ↓
-[별도 단계] Gemini - 요약 (title_ko + summary + themes 한번에 JSON으로)
-```
+  → Gemini: 헤드라인 선별 + relevance 1~5점 부여
+  → Elasticsearch 저장 (source_type=null)
+  → [별도 단계] Gemini: title_ko + brief + summary + themes
 
-**설계 원칙:**
-- 기업별 전용 수집 레이어 없음 → "미국 투자자가 볼 만한 뉴스" 포괄 수집
-  - 이유: AAPL, TSLA 등 기업 추가 시 재수집 불필요. 이미 BUSINESS/TECHNOLOGY 섹션에서 선별됨
-- 수집(선별)과 요약은 분리된 단계로 실행
+[레이어 2 - 기업 전용 뉴스]
+Alpha Vantage NEWS_SENTIMENT API (ticker 기반)
+  → 선별 없이 전량 저장 (이미 ticker 필터링됨)
+  → Gemini: title_ko + brief + summary + themes
+  → Elasticsearch 저장 (source_type="company", tickers=["NVDA"])
+```
 
 ### ES 인덱스: hindsight-news
 
 ```
 date:         keyword
 published_at: date
-category:     keyword  (BUSINESS / TECHNOLOGY / WORLD)
+category:     keyword  (BUSINESS / TECHNOLOGY / WORLD / COMPANY)
+source_type:  keyword  (null=Guardian, "company"=기업 전용)
+tickers:      keyword[] ← 관련 종목 ["NVDA"] (기업 뉴스만)
 source:       keyword
 title:        text
 title_ko:     text      ← Gemini 번역
+brief:        text      ← Gemini 1문장 요약 (카드 collapsed preview)
 url:          keyword
 body:         text
 summary:      text      ← Gemini 한국어 요약
-importance:   integer   ← 1~5 (선별 단계에서 부여)
-themes:       keyword[] ← 투자 테마 태그 (요약 단계에서 부여)
+importance:   integer   ← 1~5 (relevance 기준, 글로벌 뉴스만)
+themes:       keyword[] ← 투자 테마 태그
 llm_raw:      text      ← 디버깅용 Gemini 원본 응답 (index: false)
 ```
 
-### importance 점수 기준
+### relevance 점수 기준 (importance 필드명 유지)
 
 ```
-5 = 시장 전체 또는 핵심 산업에 매우 큰 영향 (코로나 봉쇄, FOMC 빅스텝 등)
-4 = 주요 기업/산업 흐름에 중요한 뉴스
-3 = 투자자가 참고할 가치가 높은 뉴스
-2 = 약한 관련성이 있지만 일부 투자자에겐 의미 있을 수 있는 뉴스
-1 = 관련성은 있으나 중요도가 매우 낮은 뉴스
+5 = 대부분의 투자자가 반드시 참고해야 할 수준
+4 = 특정 산업·기업 투자자에게 매우 중요한 뉴스
+3 = 투자 판단에 충분히 참고 가치가 있는 뉴스
+2 = 제한적이지만 일부 투자자에게 의미 있는 뉴스
+1 = 참고 가치는 낮지만 투자 무관 기사는 아님
 ```
 
-UI에서 기본은 importance 3 이상 노출, 4단계 필터 버튼(전체/★★★이상/★★★★이상/★★★★★만)으로 선택.
+기준: "시장 충격도"가 아닌 "당시 투자자가 참고할 이유가 있는가"
+UI 기본 필터: importance 3 이상, 4단계 선택(전체/★★★이상/★★★★이상/★★★★★만)
 
 ### themes 태그 시스템 (28개 flat 구조)
 
@@ -298,15 +301,34 @@ OTHER
   - summary 프롬프트: 의미 전환 시 \n\n 문단 분리
   - 비거래일 장전/장중/장후 배지 숨김
 
+### 완료 (2026-05-18 추가)
+- M7 주가/지표 2020-12-31까지 확장 (AAPL/MSFT/GOOGL/AMZN/META/TSLA)
+- M7 이벤트 감지 확장
+- Alpha Vantage 기반 기업별 뉴스 수집기 추가 (company_news_collector.py)
+- M7 기업 뉴스 155건 수집 완료 (2020년 2월)
+- 뉴스 프롬프트 전면 개선
+  - importance → relevance 개념 전환
+  - brief 필드 추가 (1문장 카드 preview)
+  - hindsight bias 방어 문구
+  - re_score_all() 신규 추가
+  - re_summarize_all() 개선 (brief 없는 건만 처리, 이어서 실행 가능)
+  - ES 매핑: brief / source_type / tickers 필드 추가
+- 뉴스 탭 서브탭 분리 (🌎 시장 / 📈 기업 + ticker chip 필터)
+- 뉴스 카드 collapsed 상태에 brief 표시
+- 결과 화면 "투자 결과 리포트"로 개선
+  - M7 종목별 수익률 비교, 알파 기준 NASDAQ, 0 기준 발산 바 차트
+  - 투자 성향 뱃지, 로딩 스피너
+- MDD 버그 수정: 날짜 점프 시 중간 거래일 스냅샷 모두 저장
+
 ### 진행 중
-- 뉴스 요약 재실행 (re_summarize_all) — 새 프롬프트(문단 분리) 적용 필요
-  - 2020년 2월 381건 수집 완료, 요약은 구 프롬프트 상태
+- 뉴스 재처리 (re_summarize_all) — 131건 남음, 내일 이어서
 
 ### 미완료 / 다음 작업
-- 뉴스 요약 완료 (re_summarize_all 실행, Gemini 500 req/일 한도 내)
+- Guardian 뉴스 수집 범위 확장 (2020년 3월~)
+- M7 기업 뉴스 수집 범위 확장 (2020년 3월~)
 - FOMC/CPI 캘린더 이벤트 수집 (market_event 테이블)
-- 멀티 포트폴리오 실제 플레이 검증 (M7 종목 분산 투자)
-- 결과 화면 MDD 계산 검증
+- 투자 성향 분석 고도화 (보유 기간, 손절/익절 패턴)
+- 전문가 비교 (버핏 등 하드코딩, 시작점별)
 - 인프라 (docker-compose 정리, GitHub Actions CI/CD)
 
 ---

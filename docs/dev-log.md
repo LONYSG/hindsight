@@ -611,10 +611,84 @@ Guardian은 영국 매체라 UTC 오전~오후(한국/영국 업무시간)에만
 
 ---
 
+---
+
+## 2026-05-18
+
+### 29. 뉴스 시스템 2계층 구조 전환
+
+**한 것:**
+뉴스를 Guardian(글로벌 거시) + Alpha Vantage(기업 전용) 2계층으로 분리.
+
+- `company_news_collector.py` 신규 작성 (Alpha Vantage NEWS_SENTIMENT API)
+- M7 기업 뉴스 155건 수집 (2020년 2월)
+- ES 매핑에 `source_type`, `tickers` 필드 추가
+- NewsTab 서브탭 분리: 🌎 시장 / 📈 기업 (ticker chip 필터 포함)
+
+**왜 이렇게 했나:**
+Guardian은 UK 매체라 M7 기업 뉴스 밀도가 낮음. 주제 분포 확인 시 AI: 2건, SEMICONDUCTOR: 0건 수준. Guardian은 거시/지정학에 특화하고, 기업 뉴스는 ticker 기반 소스를 별도로 추가하는 게 맞음. 유저 입장에서 "시장 전체 흐름"과 "내 보유 종목 이슈"는 다른 맥락으로 소비하기 때문에 UI도 탭으로 분리.
+
+---
+
+### 30. 뉴스 프롬프트 전면 개선
+
+**한 것:**
+`_SELECTION_PROMPT`: importance → relevance 개념 전환
+- 기준: "시장 충격도" → "당시 투자자가 참고할 이유가 있는가"
+- hindsight bias 방어 문구 추가: "향후 주가 상승 예측이 아닙니다"
+
+`_SUMMARY_PROMPT`: brief 필드 추가
+- brief: 1문장 팩트 중심 요약 (카드 collapsed preview용)
+- summary 첫 문장 압축 규칙 추가
+
+`re_score_all()` 신규 추가: 날짜별 importance 재점수화 (Gemini 1회/일)
+`re_summarize_all()` 개선: brief 없는 건만 처리 → 중단 후 재실행 시 이어서 가능
+
+---
+
+### 31. 결과 화면 고도화
+
+**한 것:**
+- 제목 "게임 결과" → "투자 결과 리포트"
+- M7 종목별 수익률 비교 추가 (백엔드 calcStockReturns)
+- 알파 기준 S&P500 → NASDAQ으로 변경
+- 0 기준 발산 바 차트 (양수 오른쪽, 음수 왼쪽)
+- 투자 성향 뱃지 추가 (안정 추구형, 현금 방어형 등)
+- 로딩 스피너 추가 + error 상태 분리
+
+---
+
+### 32. M7 주가/데이터 확장
+
+**한 것:**
+- AAPL/MSFT/GOOGL/AMZN/META/TSLA 주가 2020-12-31까지 확장 (각 191건)
+- 이벤트 감지 확장 (TSLA 89건 등 총 252건)
+- 거시지표(daily_macro)는 이미 2026년까지 있어 문제없음
+
+---
+
+### 33. 주요 버그 수정
+
+**MDD 계산 오류:**
+날짜 점프 시 최종 날짜 스냅샷만 저장하던 문제. 1달 점프 시 중간 낙폭이 기록 안 됨.
+→ 점프 구간 모든 거래일 스냅샷 저장으로 수정 (PlayService.next)
+
+**버튼 테두리 잔상:**
+React 인라인 스타일에서 `border` shorthand + `borderColor` longhand 혼용 시 deselect 때 브라우저 기본값(검정)으로 fallback.
+→ borderWidth/borderStyle/borderColor 분리 + 항상 명시적으로 값 지정
+
+**100% 매수 후 잔액 부족 플래시:**
+체결 직후 cash 감소 → maxBuy=0 → 경고 메시지 순간 표시.
+→ 체결 성공 msg 있을 때 경고 억제
+
+---
+
 ## 다음에 할 것
 
-- [ ] 뉴스 요약 재실행 (`re_summarize_all()`) — 새 프롬프트(문단 분리) 적용, Gemini 500 req/일 한도 내
-- [ ] FOMC/CPI 캘린더 이벤트 확인 및 필요 시 추가 수집
+- [ ] 뉴스 재처리 완료 (`re_summarize_all()`) — 131건 남음, 내일 이어서
+- [ ] Guardian 뉴스 수집 범위 확장 (2020년 3월~)
+- [ ] M7 기업 뉴스 수집 범위 확장 (2020년 3월~)
+- [ ] FOMC/CPI 캘린더 이벤트 수집
+- [ ] 투자 성향 분석 고도화 (보유 기간, 손절/익절 패턴)
+- [ ] 전문가 비교 (버핏 등 하드코딩)
 - [ ] 인프라 (docker-compose 정리, GitHub Actions CI/CD)
-- [ ] 멀티 포트폴리오 실제 플레이 테스트 (M7 종목 간 분산 투자)
-- [ ] 결과 화면 MDD 계산 검증
