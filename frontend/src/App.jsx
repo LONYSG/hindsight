@@ -12,9 +12,9 @@ const shell = {
   maxWidth: 480,
   margin: '0 auto',
   minHeight: '100vh',
-  background: '#0f0f0f',
-  borderLeft: '1px solid #1a1a1a',
-  borderRight: '1px solid #1a1a1a',
+  background: '#f5f6f8',
+  borderLeft: '1px solid #e2e6ea',
+  borderRight: '1px solid #e2e6ea',
   position: 'relative',
 }
 

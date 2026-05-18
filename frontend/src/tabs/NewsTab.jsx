@@ -3,7 +3,7 @@ import { getNews } from '../api/data'
 import { recordNewsView } from '../api/play'
 
 const CATEGORY_META = {
-  BUSINESS:   { label: 'Business',   color: '#60a5fa' },
+  BUSINESS:   { label: 'Business',   color: '#2563eb' },
   TECHNOLOGY: { label: 'Technology', color: '#a78bfa' },
   WORLD:      { label: 'World',      color: '#34d399' },
 }
@@ -13,14 +13,34 @@ const IMPORTANCE_COLOR = { 5: '#f59e0b', 4: '#f59e0b', 3: '#888', 2: '#555', 1: 
 
 const THEME_COLOR = '#6366f1'
 
-// UTC 기준 미국 동부 시장 시간 판단 (EST = UTC-5)
+// 미국 DST: 3월 둘째 일요일 ~ 11월 첫째 일요일 = EDT(UTC-4)
+// 나머지 = EST(UTC-5)
+function nthSundayOfMonth(year, month, n) {
+  const first = new Date(Date.UTC(year, month - 1, 1))
+  const dow = first.getUTCDay() // 0=Sun
+  const daysToFirst = dow === 0 ? 0 : 7 - dow
+  return new Date(Date.UTC(year, month - 1, 1 + daysToFirst + (n - 1) * 7))
+}
+
+function isEDT(date) {
+  const year = date.getUTCFullYear()
+  const dstStart = nthSundayOfMonth(year, 3, 2)  // 3월 둘째 일요일
+  const dstEnd   = nthSundayOfMonth(year, 11, 1) // 11월 첫째 일요일
+  return date >= dstStart && date < dstEnd
+}
+
+// UTC 기준 미국 동부 시장 시간 판단 (DST 반영)
 function getMarketTiming(publishedAt) {
   if (!publishedAt) return null
   const d = new Date(publishedAt)
+  const edt = isEDT(d)
+  // EDT: 장 13:30~20:00 UTC / EST: 장 14:30~21:00 UTC
+  const openMin  = edt ? 13 * 60 + 30 : 14 * 60 + 30
+  const closeMin = edt ? 20 * 60       : 21 * 60
   const totalMin = d.getUTCHours() * 60 + d.getUTCMinutes()
-  if (totalMin < 14 * 60 + 30)  return { label: '장전', color: '#60a5fa', tip: '미국 장 시작 전 보도 → 당일 주가에 반영 가능' }
-  if (totalMin <= 21 * 60)      return { label: '장중', color: '#f59e0b', tip: '미국 장 중 보도 → 당일 주가에 실시간 반영' }
-  return                               { label: '장후', color: '#666',    tip: '미국 장 마감 후 보도 → 다음 거래일 주가에 반영' }
+  if (totalMin < openMin)  return { label: '장전', color: '#2563eb', tip: '미국 장 시작 전 보도 → 당일 주가에 반영 가능' }
+  if (totalMin <= closeMin) return { label: '장중', color: '#f59e0b', tip: '미국 장 중 보도 → 당일 주가에 실시간 반영' }
+  return                           { label: '장후', color: '#9ca3af', tip: '미국 장 마감 후 보도 → 다음 거래일 주가에 반영' }
 }
 
 function cleanSummary(text) {
@@ -28,40 +48,73 @@ function cleanSummary(text) {
   return text.replace(/^요약\s*:\s*/i, '').replace(/^\[요약\]\s*/i, '').trim()
 }
 
+const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토']
+
+function getDateSepInfo(dateStr, simDate, prevTradingDay) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dow = new Date(y, m - 1, d).getDay()
+  const formatted = `${y}.${String(m).padStart(2,'0')}.${String(d).padStart(2,'0')} (${DAYS_KO[dow]})`
+
+  if (dateStr === simDate)       return { formatted, tag: null }
+  if (dateStr === prevTradingDay) return { formatted, tag: '전일 장후', tagBg: '#eff6ff', tagColor: '#1d4ed8' }
+  if (dow === 6) return { formatted, tag: '토요일', tagBg: '#fef3c7', tagColor: '#92400e' }
+  if (dow === 0) return { formatted, tag: '일요일', tagBg: '#fef3c7', tagColor: '#92400e' }
+  // 평일인데 prevTradingDay도 simDate도 아님 → 공휴일
+  return { formatted, tag: '공휴일', tagBg: '#fce7f3', tagColor: '#9d174d' }
+}
+
+const IMP_FILTERS = [
+  { label: '전체',      value: 1 },
+  { label: '★★★ 이상',  value: 3 },
+  { label: '★★★★ 이상', value: 4 },
+  { label: '★★★★★만',  value: 5 },
+]
+
 export default function NewsTab({ simDate, sessionId }) {
-  const [articles, setArticles] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [expanded, setExpanded] = useState(null)
-  const [showAll, setShowAll] = useState(false)  // true = importance >= 2 포함
+  const [articles, setArticles]           = useState([])
+  const [prevTradingDay, setPrevTradingDay] = useState(null)
+  const [loading, setLoading]             = useState(false)
+  const [expanded, setExpanded]           = useState(null)
+  const [minImp, setMinImp]               = useState(3)
 
   useEffect(() => {
     if (!simDate) return
     setLoading(true)
     setExpanded(null)
-    const minImportance = showAll ? 2 : 3
-    getNews(simDate, minImportance)
-      .then((r) => setArticles(r.data))
-      .catch(() => setArticles([]))
+    getNews(simDate, minImp)
+      .then((r) => {
+        setArticles(r.data.articles ?? [])
+        setPrevTradingDay(r.data.prevTradingDay ?? null)
+      })
+      .catch(() => { setArticles([]); setPrevTradingDay(null) })
       .finally(() => setLoading(false))
-  }, [simDate, showAll])
+  }, [simDate, minImp])
 
   if (loading) return <div style={s.center}>뉴스 불러오는 중...</div>
 
-  const coreCount  = articles.filter(a => (a.importance ?? 3) >= 3).length
-  const weakCount  = articles.filter(a => (a.importance ?? 3) < 3).length
+  // 날짜별 그룹핑 (published_at 기준 이미 ASC 정렬된 상태)
+  const grouped = articles.reduce((acc, a) => {
+    const d = a.date || (a.publishedAt ? a.publishedAt.slice(0, 10) : simDate)
+    if (!acc[d]) acc[d] = []
+    acc[d].push(a)
+    return acc
+  }, {})
+  const groups = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b))
 
   return (
     <div style={s.root}>
-      {/* 헤더 + 토글 */}
+      {/* 헤더 + 중요도 필터 */}
       <div style={s.headerRow}>
-        <span style={s.header}>{simDate} · {articles.length}건</span>
-        <button
-          style={{ ...s.toggleBtn, color: showAll ? '#f59e0b' : '#555' }}
-          onClick={() => setShowAll(v => !v)}
-          title="importance 2점 약한 신호 포함"
-        >
-          {showAll ? '약한 신호 포함 중' : '약한 신호 보기'}
-        </button>
+        <span style={s.header}>{articles.length}건</span>
+        <div style={s.filterRow}>
+          {IMP_FILTERS.map(f => (
+            <button key={f.value}
+              style={{ ...s.filterBtn, ...(minImp === f.value ? s.filterActive : {}) }}
+              onClick={() => setMinImp(f.value)}>
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {articles.length === 0 ? (
@@ -71,78 +124,101 @@ export default function NewsTab({ simDate, sessionId }) {
           <div style={s.emptyDesc}>뉴스는 2020년 2~4월 기간에 수집됐어요</div>
         </div>
       ) : (
-        articles.map((a, i) => {
-          const meta   = CATEGORY_META[a.category] || { label: a.category, color: '#888' }
-          const timing = getMarketTiming(a.publishedAt)
-          const isOpen = expanded === i
-          const summary = cleanSummary(a.summary)
-          const imp    = a.importance ?? null
-          const isWeak = imp !== null && imp < 3
+        groups.map(([dateStr, dateArticles]) => {
+          const sepInfo  = getDateSepInfo(dateStr, simDate, prevTradingDay)
+          const isTodayGroup = dateStr === simDate
 
           return (
-            <div key={i} style={{ ...s.card, opacity: isWeak ? 0.7 : 1 }}
-                 onClick={() => {
-                   const opening = !isOpen
-                   setExpanded(opening ? i : null)
-                   if (opening && sessionId && a.id) recordNewsView(sessionId, a.id)
-                 }}>
-
-              {/* 배지 행 */}
-              <div style={s.badges}>
-                <span style={{ ...s.badge, color: meta.color, background: meta.color + '18', border: `1px solid ${meta.color}30` }}>
-                  {meta.label}
-                </span>
-                {timing && (
-                  <span style={{ ...s.timingBadge, color: timing.color }} title={timing.tip}>
-                    {timing.label}
-                  </span>
-                )}
-                {imp !== null && (
-                  <span style={{ ...s.impBadge, color: IMPORTANCE_COLOR[imp] }}
-                        title={`당시 투자자 중요도 ${imp}점`}>
-                    {IMPORTANCE_LABEL[imp]}
-                  </span>
-                )}
-                <span style={s.toggle}>{isOpen ? '▲' : '▼'}</span>
+            <div key={dateStr}>
+              {/* 날짜 구분선 */}
+              <div style={s.dateSep}>
+                <div style={s.dateSepLine} />
+                <div style={s.dateSepLabel}>
+                  <span style={s.dateSepDate}>{sepInfo.formatted}</span>
+                  {sepInfo.tag && (
+                    <span style={{ ...s.dateSepTag, background: sepInfo.tagBg, color: sepInfo.tagColor }}>
+                      {sepInfo.tag}
+                    </span>
+                  )}
+                </div>
+                <div style={s.dateSepLine} />
               </div>
 
-              {/* 제목 */}
-              <div style={s.title}>{a.titleKo || a.title}</div>
-              {a.titleKo && <div style={s.titleEn}>{a.title}</div>}
+              {/* 해당 날짜 기사 목록 */}
+              {dateArticles.map((a) => {
+                const meta    = CATEGORY_META[a.category] || { label: a.category, color: '#888' }
+                const timing  = isTodayGroup ? getMarketTiming(a.publishedAt) : null
+                const isOpen  = expanded === a.id
+                const summary = cleanSummary(a.summary)
+                const imp     = a.importance ?? null
 
-              {/* 펼쳐진 상태 */}
-              {isOpen && (
-                <div style={s.detail}>
-                  {summary ? (
-                    <>
-                      <div style={s.sectionLabel}>AI 요약</div>
-                      <div style={s.summary}>
-                        {summary.split('\n').filter(l => l.trim()).map((line, j) => (
-                          <p key={j} style={s.summaryPara}>{line.trim()}</p>
-                        ))}
+                return (
+                  <div key={a.id} style={s.card}
+                       onClick={() => {
+                         const opening = !isOpen
+                         setExpanded(opening ? a.id : null)
+                         if (opening && sessionId && a.id) recordNewsView(sessionId, a.id)
+                       }}>
+
+                    {/* 배지 행 */}
+                    <div style={s.badges}>
+                      <span style={{ ...s.badge, color: meta.color, background: meta.color + '15', border: `1px solid ${meta.color}40` }}>
+                        {meta.label}
+                      </span>
+                      {timing && (
+                        <span style={{ ...s.timingBadge, color: timing.color }} title={timing.tip}>
+                          {timing.label}
+                        </span>
+                      )}
+                      {imp !== null && (
+                        <span style={{ ...s.impBadge, color: IMPORTANCE_COLOR[imp] }}
+                              title={`당시 투자자 중요도 ${imp}점`}>
+                          {IMPORTANCE_LABEL[imp]}
+                        </span>
+                      )}
+                      <span style={s.toggle}>{isOpen ? '▲' : '▼'}</span>
+                    </div>
+
+                    {/* 제목 */}
+                    <div style={s.title}>{a.titleKo || a.title}</div>
+                    {a.titleKo && <div style={s.titleEn}>{a.title}</div>}
+
+                    {/* 펼쳐진 상태 */}
+                    {isOpen && (
+                      <div style={s.detail}>
+                        {summary ? (
+                          <>
+                            <div style={s.sectionLabel}>AI 요약</div>
+                            <div style={s.summary}>
+                              {summary.split(/\n\s*\n/).filter(l => l.trim()).map((line, j) => (
+                                <p key={j} style={s.summaryPara}>{line.trim()}</p>
+                              ))}
+                            </div>
+                          </>
+                        ) : (
+                          <p style={s.noSummary}>요약 준비 중</p>
+                        )}
+                        {timing && (
+                          <div style={{ fontSize: 11, color: timing.color, marginTop: 10, opacity: 0.8 }}>
+                            ⏱ {timing.tip}
+                          </div>
+                        )}
+                        {a.themes?.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 10 }}>
+                            {a.themes.map(t => (
+                              <span key={t} style={s.themeBadge}>{t}</span>
+                            ))}
+                          </div>
+                        )}
+                        <a href={a.url} target="_blank" rel="noopener noreferrer" style={s.link}
+                           onClick={e => e.stopPropagation()}>
+                          원문 보기 →
+                        </a>
                       </div>
-                    </>
-                  ) : (
-                    <p style={s.noSummary}>요약 준비 중</p>
-                  )}
-                  {timing && (
-                    <div style={{ fontSize: 11, color: timing.color, marginTop: 10, opacity: 0.8 }}>
-                      ⏱ {timing.tip}
-                    </div>
-                  )}
-                  {a.themes?.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 10 }}>
-                      {a.themes.map(t => (
-                        <span key={t} style={s.themeBadge}>{t}</span>
-                      ))}
-                    </div>
-                  )}
-                  <a href={a.url} target="_blank" rel="noopener noreferrer" style={s.link}
-                     onClick={e => e.stopPropagation()}>
-                    원문 보기 →
-                  </a>
-                </div>
-              )}
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )
         })
@@ -152,28 +228,35 @@ export default function NewsTab({ simDate, sessionId }) {
 }
 
 const s = {
-  root:        { display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' },
-  center:      { color: '#555', textAlign: 'center', paddingTop: 60, fontSize: 13 },
-  headerRow:   { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  header:      { color: '#555', fontSize: 11 },
-  toggleBtn:   { background: 'none', border: '1px solid #252525', borderRadius: 5, padding: '3px 8px', fontSize: 11, cursor: 'pointer' },
-  card:        { background: '#161616', borderRadius: 10, padding: '12px 14px', cursor: 'pointer', border: '1px solid #1e1e1e' },
+  root:        { display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', paddingBottom: 8 },
+  dateSep:     { display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 4px' },
+  dateSepLine: { flex: 1, height: 1, background: '#e8eaed' },
+  dateSepLabel:{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 },
+  dateSepDate: { fontSize: 11, color: '#9ca3af', fontWeight: 500, whiteSpace: 'nowrap' },
+  dateSepTag:  { fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap' },
+  center:      { color: '#9ca3af', textAlign: 'center', paddingTop: 60, fontSize: 13 },
+  headerRow:   { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 },
+  header:      { color: '#9ca3af', fontSize: 11 },
+  filterRow:   { display: 'flex', gap: 4 },
+  filterBtn:   { background: 'none', border: '1px solid #e5e7eb', borderRadius: 5, padding: '3px 8px', fontSize: 10, fontWeight: 600, color: '#9ca3af', cursor: 'pointer', whiteSpace: 'nowrap' },
+  filterActive:{ background: '#f0fdf4', border: '1px solid #16a34a', color: '#16a34a' },
+  card:        { background: '#fff', borderRadius: 10, padding: '12px 14px', cursor: 'pointer', border: '1px solid #e8eaed' },
   badges:      { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' },
   badge:       { fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4 },
-  timingBadge: { fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 4, border: '1px solid #333' },
+  timingBadge: { fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 4, border: '1px solid #e5e7eb' },
   impBadge:    { fontSize: 11, marginLeft: 'auto' },
-  toggle:      { color: '#444', fontSize: 10, marginLeft: 4 },
-  title:       { color: '#e8e8e8', fontSize: 13, fontWeight: 500, lineHeight: 1.5 },
-  titleEn:     { color: '#444', fontSize: 11, marginTop: 3, lineHeight: 1.4 },
-  detail:      { marginTop: 12, borderTop: '1px solid #252525', paddingTop: 12 },
-  sectionLabel:{ color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  toggle:      { color: '#d1d5db', fontSize: 10, marginLeft: 4 },
+  title:       { color: '#111827', fontSize: 13, fontWeight: 500, lineHeight: 1.5 },
+  titleEn:     { color: '#d1d5db', fontSize: 11, marginTop: 3, lineHeight: 1.4 },
+  detail:      { marginTop: 12, borderTop: '1px solid #f3f4f6', paddingTop: 12 },
+  sectionLabel:{ color: '#9ca3af', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   summary:     { display: 'flex', flexDirection: 'column', gap: 8 },
-  summaryPara: { color: '#bbb', fontSize: 13, lineHeight: 1.75, margin: 0 },
-  noSummary:   { color: '#444', fontSize: 13 },
-  link:        { display: 'inline-block', marginTop: 10, color: '#60a5fa', fontSize: 12, textDecoration: 'none' },
-  themeBadge:  { fontSize: 10, color: THEME_COLOR, background: THEME_COLOR + '18', border: `1px solid ${THEME_COLOR}33`, borderRadius: 3, padding: '2px 6px', fontWeight: 600 },
+  summaryPara: { color: '#374151', fontSize: 13, lineHeight: 1.75, margin: 0 },
+  noSummary:   { color: '#d1d5db', fontSize: 13 },
+  link:        { display: 'inline-block', marginTop: 10, color: '#2563eb', fontSize: 12, textDecoration: 'none' },
+  themeBadge:  { fontSize: 10, color: THEME_COLOR, background: THEME_COLOR + '15', border: `1px solid ${THEME_COLOR}33`, borderRadius: 3, padding: '2px 6px', fontWeight: 600 },
   empty:       { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 10 },
   emptyIcon:   { fontSize: 36 },
-  emptyTitle:  { color: '#555', fontSize: 15, fontWeight: 600 },
+  emptyTitle:  { color: '#9ca3af', fontSize: 15, fontWeight: 600 },
   emptyDesc:   { color: '#333', fontSize: 12, textAlign: 'center' },
 }

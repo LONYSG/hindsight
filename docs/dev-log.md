@@ -479,10 +479,142 @@ venv/bin/python3 -c "from collectors.news_collector import re_summarize_all; re_
 
 ---
 
+---
+
+## 2026-05-15
+
+### 23. 전체 UI 라이트모드 전환
+
+**한 것:**
+LoginPage, SetupPage, PlayPage, ResultPage 및 모든 탭(PriceTab, PortfolioTab, NewsTab, OrderBottomSheet)의 다크모드 → 라이트모드 전환.
+
+**색상 팔레트:**
+- 배경: `#f5f6f8` (페이지), `#ffffff` (카드/패널)
+- 테두리: `#e8eaed` / `#e5e7eb`
+- 텍스트 주요: `#111827`, 보조: `#6b7280`, 음소거: `#9ca3af`
+- 가격 상승(빨강): `#f43f5e`, 하락(파랑): `#3b82f6` — 한국 MTS 관례 유지
+
+**차트(lightweight-charts) 라이트 테마:**
+`layout.background.color: '#ffffff'`, grid `#f3f4f6`, crosshair `#d1d5db`
+
+**강조색 변경:**
+초록 강조(`#4ade80` / `#000`) → `#16a34a` / `#fff`. 밝은 배경 위에서 가독성 확보.
+
+---
+
+### 24. PlayPage 헤더 전면 재설계
+
+**변경 전:**
+- "시뮬레이션 날짜" 라벨 + 날짜 두 줄 표시
+- 이벤트 배지 다수가 헤더에 직접 노출 → 공간 낭비 + 정보 과다
+- "종 료" 버튼 텍스트 세로 줄바꿈 (whiteSpace 미지정)
+
+**변경 후:**
+- 날짜 한 줄 형식: `2020.02.15 (토)` (요일 자동 계산)
+- 🔔 종 아이콘 + 빨간 배지(이벤트 수) → 클릭 시 드롭다운 패널
+- 이벤트 설명 구체화: `NVDA 주가급변`, `NVDA 거래량급증`, `FOMC 금리 결정`, `NVDA Q4 실적발표`
+  - `EventInfo`에 `companyTicker` 필드 추가 (백엔드)
+- 종료 버튼: `whiteSpace: nowrap` + `flexShrink: 0`
+
+**탭 잔상 버그 수정:**
+비활성 탭 `tabBtn`에 `borderBottom: '2px solid transparent'` 명시.
+React 인라인 스타일에서 `border: none` shorthand가 이전에 명시 설정된 `borderBottom`을 완전히 덮어쓰지 못하는 브라우저 동작 때문이었음.
+
+---
+
+### 25. PriceTab % 계산 버그 수정
+
+**문제:**
+PRICE_SPIKE는 "전일 종가 대비 당일 종가 ±3% 이상"으로 감지하는데, 차트 헤더의 % 표시는 `(close - open) / open` (당일 시가 대비)을 쓰고 있었음.
+예: 71.05 → 73.52면 전일 대비 3.47%인데 화면엔 1.43%로 표시.
+
+**수정:**
+`prevClose` state 추가. 데이터 로드 시 마지막 캔들 직전 캔들의 close를 저장.
+변동률 = `(today.close - prevClose) / prevClose`. 전일 데이터가 없으면 당일 open 기준 폴백.
+
+---
+
+### 26. 차트 줌 레벨 유지
+
+**문제:**
+날짜 점프할 때마다 `fitContent()` 호출 → 줌이 리셋됨.
+
+**수정:**
+`prevSelectedId` ref 추가. 종목 변경 시에만 `fitContent()`, 날짜 점프 시에는 `scrollToRealTime()` 사용.
+줌(visible bar 수) 유지 + 최신 캔들로 자동 스크롤.
+
+---
+
+### 27. 바텀시트 주문창 maxWidth 수정
+
+**문제:**
+OrderBottomSheet의 `maxWidth: 760`이 App.jsx 셸(`maxWidth: 480`)보다 커서 PC 넓은 화면에서 양쪽 삐져나옴.
+
+**원인:**
+`position: fixed`는 viewport 기준으로 위치하므로 부모 셸의 maxWidth 제약을 받지 않음.
+
+**수정:** `maxWidth: 760` → `maxWidth: 480`. `left: '50%'` + `transform: 'translateX(-50%)'`로 셸과 완벽 정렬.
+
+---
+
+### 28. 뉴스 시스템 전면 개선
+
+**핵심 문제: look-ahead bias**
+장후(after-hours) 뉴스가 당일에 그대로 노출되면 투자자가 "미래 정보"를 보고 매매하는 부정행위 가능.
+
+**해결: published_at 범위 기반 쿼리**
+
+```
+노출 범위: (전 거래일 장마감 UTC, 당일 장마감 UTC]
+```
+
+`date` 필드 기반 쿼리 → `published_at` 범위 쿼리로 완전 교체.
+- 장후 뉴스 당일 노출 차단
+- 주말/공휴일 뉴스 다음 거래일 자동 이월
+- `DailyPriceRepository.findFirstByCompanyIdAndDateLessThanOrderByDateDesc()`로 전 거래일 조회
+
+**DST(서머타임) 반영:**
+미국 DST는 2007년부터 고정: 3월 둘째 일요일 ~ 11월 첫째 일요일 = EDT(UTC-4), 장마감 20:00 UTC.
+나머지 = EST(UTC-5), 장마감 21:00 UTC.
+`nthSundayOfMonth()` 헬퍼로 연도별 정확한 DST 전환일 계산. 백엔드 + 프론트 모두 적용.
+
+**반일 개장(early close):** 추수감사절 다음날 등 불규칙한 날. 별도 캘린더 없이는 처리 불가 → 미지원 명시.
+
+**정렬 변경:**
+`importance DESC` → `published_at ASC` (시간순 고정).
+같은 날짜 안에서도 시간 흐름대로 표시 → 정정 보도가 올바른 위치에 노출.
+
+**날짜 구분선 추가:**
+기사들을 `date` 필드로 그룹핑, 각 그룹에 날짜 구분선 표시.
+- `simDate`: 배지 없음 (오늘)
+- 토요일: `토요일` 배지 (노란색)
+- 일요일: `일요일` 배지 (노란색)
+- 평일 비거래일(공휴일): `공휴일` 배지 (핑크색)
+- 이전 거래일: `전일 장후` 배지 (파란색) — `prevTradingDay` 백엔드에서 전달
+
+**장전/장중/장후 배지:**
+오늘(simDate) 기사에만 표시. 비거래일(주말/공휴일) 기사에는 표시 안 함.
+
+**NewsResponse DTO 신설:**
+`{ prevTradingDay: string, articles: [...] }` 구조. 프론트가 `prevTradingDay`를 알아야 "전일 장후" vs "공휴일"을 정확히 구분 가능.
+
+**중요도 필터 버튼:**
+기존 "약한 신호 보기" 토글 → 4단계 필터 버튼으로 교체.
+`전체 / ★★★ 이상(기본) / ★★★★ 이상 / ★★★★★만`
+
+**summary 프롬프트 개선:**
+"일반 문단 형태" → "의미 전환 시에만 `\n\n` 문단 분리". 다음 `re_summarize_all()` 실행 시 적용.
+프론트 파싱도 `split('\n')` → `split(/\n\s*\n/)` 로 변경.
+
+**금요일 장후 뉴스 부재:**
+Guardian은 영국 매체라 UTC 오전~오후(한국/영국 업무시간)에만 발행. 미국 장마감(21:00 UTC = 오후 4시 EST) 이후 기사가 없음. 데이터 특성상 정상.
+
+---
+
 ## 다음에 할 것
 
-- [ ] 뉴스 재수집 실행 (1, 2단계: Guardian API, Gemini 쿼터 무관)
-- [ ] 요약 재실행 (3단계: Gemini 쿼터 리셋 후, 하루 ~250건)
-- [ ] PR 머지 → develop 반영 ✅ (오늘 완료)
-- [ ] FOMC/CPI 캘린더 이벤트 수집 (market_event 테이블)
+- [ ] 뉴스 요약 재실행 (`re_summarize_all()`) — 새 프롬프트(문단 분리) 적용, Gemini 500 req/일 한도 내
+- [ ] FOMC/CPI 캘린더 이벤트 확인 및 필요 시 추가 수집
 - [ ] 인프라 (docker-compose 정리, GitHub Actions CI/CD)
+- [ ] 멀티 포트폴리오 실제 플레이 테스트 (M7 종목 간 분산 투자)
+- [ ] 결과 화면 MDD 계산 검증

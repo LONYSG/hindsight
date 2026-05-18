@@ -1,12 +1,44 @@
 import { useEffect, useRef, useState } from 'react'
-import { createChart, CandlestickSeries, LineSeries } from 'lightweight-charts'
+import { createChart, CandlestickSeries, LineSeries, HistogramSeries } from 'lightweight-charts'
 import { getCompanies, getPriceHistory, getIndicators } from '../api/data'
+import OrderBottomSheet from '../components/OrderBottomSheet'
 
 const fmt    = (n) => '$' + Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtNum = (n) => Number(n ?? 0).toLocaleString('en-US')
 const upColor = '#f43f5e'
 const dnColor = '#3b82f6'
 
+// ── localStorage ──────────────────────────────────────────
+const PREF_KEY = 'hindsight_chart_prefs'
+
+const DEFAULT_PREFS = {
+  showMA:   { 5: false, 20: false, 60: false },
+  showBB:   false,
+  showIchi: false,
+  showRSI:  false,
+  showMACD: false,
+  showVol:  true,   // 거래량만 기본 ON
+}
+
+function loadPrefs() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PREF_KEY) || '{}')
+    return {
+      showMA:   { ...DEFAULT_PREFS.showMA,   ...(saved.showMA   || {}) },
+      showBB:   saved.showBB   ?? DEFAULT_PREFS.showBB,
+      showIchi: saved.showIchi ?? DEFAULT_PREFS.showIchi,
+      showRSI:  saved.showRSI  ?? DEFAULT_PREFS.showRSI,
+      showMACD: saved.showMACD ?? DEFAULT_PREFS.showMACD,
+      showVol:  saved.showVol  ?? DEFAULT_PREFS.showVol,
+    }
+  } catch { return DEFAULT_PREFS }
+}
+
+function savePrefs(prefs) {
+  localStorage.setItem(PREF_KEY, JSON.stringify(prefs))
+}
+
+// ── 지표 계산 ─────────────────────────────────────────────
 function chartFrom(startDate) {
   const d = new Date(startDate)
   d.setMonth(d.getMonth() - 6)
@@ -34,33 +66,42 @@ function calcBB(candles, period = 20, mult = 2) {
   return { upper, lower }
 }
 
+// ── 차트 공통 옵션 ────────────────────────────────────────
 const BASE_OPTS = {
   autoSize: true,
-  layout: { background: { color: '#0f0f0f' }, textColor: '#555', fontSize: 10 },
-  grid: { vertLines: { color: '#111' }, horzLines: { color: '#111' } },
-  crosshair: { vertLine: { color: '#2a2a2a' }, horzLine: { color: '#2a2a2a' } },
-  rightPriceScale: { borderColor: '#1a1a1a', textColor: '#555' },
-  timeScale: { borderColor: '#1a1a1a', timeVisible: false },
+  layout: { background: { color: '#ffffff' }, textColor: '#6b7280', fontSize: 10 },
+  grid: { vertLines: { color: '#f3f4f6' }, horzLines: { color: '#f3f4f6' } },
+  crosshair: { vertLine: { color: '#d1d5db' }, horzLine: { color: '#d1d5db' } },
+  rightPriceScale: { borderColor: '#e5e7eb', textColor: '#9ca3af' },
+  timeScale: { borderColor: '#e5e7eb', timeVisible: false },
   handleScroll: true, handleScale: true,
 }
 
 const MA_COLORS = { 5: '#f59e0b', 20: '#60a5fa', 60: '#4ade80' }
 
-export default function PriceTab({ state, startDate }) {
-  const { simDate, holdings = [] } = state
+export default function PriceTab({ state, startDate, sessionId, onTraded }) {
+  const { simDate, holdings = [], portfolio } = state
+  const [orderTab, setOrderTab] = useState(null) // 'BUY' | 'SELL' | null
 
   const [companies, setCompanies] = useState([])
   const [selected, setSelected]   = useState(null)
   const [currentPrice, setCurrentPrice] = useState(null)
+  const [prevClose, setPrevClose]       = useState(null)
 
-  // 오버레이 토글 (메인 차트 위)
-  const [showMA,   setShowMA]   = useState({ 5: true, 20: true, 60: false })
-  const [showBB,   setShowBB]   = useState(false)
-  const [showIchi, setShowIchi] = useState(false)
+  // 저장된 설정 로드
+  const prefs = useRef(loadPrefs())
+  const [showMA,   setShowMA]   = useState(prefs.current.showMA)
+  const [showBB,   setShowBB]   = useState(prefs.current.showBB)
+  const [showIchi, setShowIchi] = useState(prefs.current.showIchi)
+  const [showRSI,  setShowRSI]  = useState(prefs.current.showRSI)
+  const [showMACD, setShowMACD] = useState(prefs.current.showMACD)
+  const [showVol,  setShowVol]  = useState(prefs.current.showVol)
 
-  // 패널 토글 (하단 별도 차트)
-  const [showRSI,  setShowRSI]  = useState(false)
-  const [showMACD, setShowMACD] = useState(false)
+  // 설정 저장 헬퍼
+  const persist = (patch) => {
+    prefs.current = { ...prefs.current, ...patch }
+    savePrefs(prefs.current)
+  }
 
   // DOM refs
   const mainDiv = useRef(null)
@@ -73,19 +114,19 @@ export default function PriceTab({ state, startDate }) {
   const macdChart = useRef(null)
 
   // 시리즈 refs
-  const candleSr   = useRef(null)
-  const maSr       = useRef({})
-  const bbUpperSr  = useRef(null)
-  const bbLowerSr  = useRef(null)
-  const ichiSr     = useRef({})  // tenkan, kijun, senkouA, senkouB
-  const rsiSr      = useRef(null)
-  const macdSr     = useRef(null)
-  const signalSr   = useRef(null)
+  const candleSr  = useRef(null)
+  const volSr     = useRef(null)
+  const maSr      = useRef({})
+  const bbUpperSr = useRef(null)
+  const bbLowerSr = useRef(null)
+  const ichiSr    = useRef({})
+  const rsiSr     = useRef(null)
+  const macdSr    = useRef(null)
+  const signalSr  = useRef(null)
 
-  // 데이터 캐시
-  const priceCache = useRef([])
-  const indCache   = useRef([])
-  const syncing    = useRef(false)
+  const indCache      = useRef([])
+  const syncing       = useRef(false)
+  const prevSelectedId = useRef(null)
 
   useEffect(() => {
     getCompanies().then(r => {
@@ -95,45 +136,54 @@ export default function PriceTab({ state, startDate }) {
     })
   }, [])
 
-  // 메인 차트 초기화
+  // ── 메인 차트 초기화 ─────────────────────────────────────
   useEffect(() => {
     if (!mainDiv.current) return
     const chart = createChart(mainDiv.current, BASE_OPTS)
 
+    // 캔들
     candleSr.current = chart.addSeries(CandlestickSeries, {
       upColor, downColor: dnColor,
       borderUpColor: upColor, borderDownColor: dnColor,
       wickUpColor: upColor, wickDownColor: dnColor,
     })
 
-    // MA 시리즈
+    // 거래량 (메인 차트 하단 15% 영역)
+    volSr.current = chart.addSeries(HistogramSeries, {
+      priceFormat: { type: 'volume' },
+      priceScaleId: 'vol',
+      visible: prefs.current.showVol,
+    })
+    chart.priceScale('vol').applyOptions({
+      scaleMargins: { top: 0.85, bottom: 0 },
+      visible: false,
+    })
+
+    // MA
     ;[5, 20, 60].forEach(p => {
       maSr.current[p] = chart.addSeries(LineSeries, {
-        color: MA_COLORS[p], lineWidth: 1, visible: showMA[p],
+        color: MA_COLORS[p], lineWidth: 1,
+        visible: prefs.current.showMA[p],
         priceLineVisible: false, lastValueVisible: false,
       })
     })
 
-    // 볼린저 밴드 (숨김 상태로 생성)
-    const bbStyle = { lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, visible: false }
-    bbUpperSr.current = chart.addSeries(LineSeries, { ...bbStyle, color: '#8b5cf6' })
-    bbLowerSr.current = chart.addSeries(LineSeries, { ...bbStyle, color: '#8b5cf6' })
+    // 볼린저 밴드
+    const bbStyle = { lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }
+    bbUpperSr.current = chart.addSeries(LineSeries, { ...bbStyle, color: '#8b5cf6', visible: prefs.current.showBB })
+    bbLowerSr.current = chart.addSeries(LineSeries, { ...bbStyle, color: '#8b5cf6', visible: prefs.current.showBB })
 
-    // 이치모쿠 시리즈 (숨김 상태로 생성)
-    const ichiColors = { tenkan: '#f43f5e', kijun: '#3b82f6', senkouA: '#4ade8066', senkouB: '#f59e0b66' }
-    Object.entries(ichiColors).forEach(([key, color]) => {
-      ichiSr.current[key] = chart.addSeries(LineSeries, {
-        color, lineWidth: key.startsWith('senkou') ? 1 : 1.5,
-        lineStyle: key.startsWith('senkou') ? 2 : 0,
-        priceLineVisible: false, lastValueVisible: false, visible: false,
-      })
-    })
+    // 이치모쿠
+    ichiSr.current.tenkan  = chart.addSeries(LineSeries, { color: '#f43f5e', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, visible: prefs.current.showIchi })
+    ichiSr.current.kijun   = chart.addSeries(LineSeries, { color: '#3b82f6', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, visible: prefs.current.showIchi })
+    ichiSr.current.senkouA = chart.addSeries(LineSeries, { color: '#4ade8066', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, visible: prefs.current.showIchi })
+    ichiSr.current.senkouB = chart.addSeries(LineSeries, { color: '#f59e0b66', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, visible: prefs.current.showIchi })
 
     mainChart.current = chart
     return () => { chart.remove(); mainChart.current = null }
   }, [])
 
-  // RSI 차트
+  // ── RSI 차트 ──────────────────────────────────────────────
   useEffect(() => {
     if (!rsiDiv.current || !showRSI) return
     const chart = createChart(rsiDiv.current, {
@@ -151,7 +201,7 @@ export default function PriceTab({ state, startDate }) {
     return () => { chart.remove(); rsiChart.current = null; rsiSr.current = null }
   }, [showRSI])
 
-  // MACD 차트
+  // ── MACD 차트 ─────────────────────────────────────────────
   useEffect(() => {
     if (!macdDiv.current || !showMACD) return
     const chart = createChart(macdDiv.current, BASE_OPTS)
@@ -166,7 +216,7 @@ export default function PriceTab({ state, startDate }) {
     return () => { chart.remove(); macdChart.current = null; macdSr.current = null; signalSr.current = null }
   }, [showMACD])
 
-  // 데이터 로드
+  // ── 데이터 로드 ───────────────────────────────────────────
   useEffect(() => {
     if (!selected || !startDate || !simDate || !candleSr.current) return
     const from = chartFrom(startDate)
@@ -176,57 +226,90 @@ export default function PriceTab({ state, startDate }) {
     ]).then(([priceRes, indRes]) => {
       const candles = priceRes.data.map(p => ({
         time: p.date, open: Number(p.open), high: Number(p.high),
-        low: Number(p.low), close: Number(p.close),
+        low: Number(p.low), close: Number(p.close), volume: Number(p.volume),
       }))
-      priceCache.current = candles
-      indCache.current   = indRes.data
+      indCache.current = indRes.data
 
       candleSr.current.setData(candles)
+
+      // 거래량
+      volSr.current.setData(candles.map(c => ({
+        time: c.time,
+        value: c.volume,
+        color: c.close >= c.open ? upColor + '55' : dnColor + '55',
+      })))
+
+      // MA
       ;[5, 20, 60].forEach(p => maSr.current[p]?.setData(calcMA(candles, p)))
 
+      // 볼린저
       const { upper, lower } = calcBB(candles)
       bbUpperSr.current.setData(upper)
       bbLowerSr.current.setData(lower)
 
+      // 이치모쿠
       const iData = {
-        tenkan:   indRes.data.filter(i => i.ichimokuTenkan  != null).map(i => ({ time: i.date, value: Number(i.ichimokuTenkan) })),
-        kijun:    indRes.data.filter(i => i.ichimokuKijun   != null).map(i => ({ time: i.date, value: Number(i.ichimokuKijun) })),
-        senkouA:  indRes.data.filter(i => i.ichimokuSenkouA != null).map(i => ({ time: i.date, value: Number(i.ichimokuSenkouA) })),
-        senkouB:  indRes.data.filter(i => i.ichimokuSenkouB != null).map(i => ({ time: i.date, value: Number(i.ichimokuSenkouB) })),
+        tenkan:  indRes.data.filter(i => i.ichimokuTenkan  != null).map(i => ({ time: i.date, value: Number(i.ichimokuTenkan) })),
+        kijun:   indRes.data.filter(i => i.ichimokuKijun   != null).map(i => ({ time: i.date, value: Number(i.ichimokuKijun) })),
+        senkouA: indRes.data.filter(i => i.ichimokuSenkouA != null).map(i => ({ time: i.date, value: Number(i.ichimokuSenkouA) })),
+        senkouB: indRes.data.filter(i => i.ichimokuSenkouB != null).map(i => ({ time: i.date, value: Number(i.ichimokuSenkouB) })),
       }
       Object.entries(iData).forEach(([k, d]) => ichiSr.current[k]?.setData(d))
 
+      // RSI/MACD (패널 열려있을 때)
       if (rsiSr.current) {
-        const rsi = indRes.data.filter(i => i.rsi != null).map(i => ({ time: i.date, value: Number(i.rsi) }))
-        rsiSr.current.setData(rsi)
+        rsiSr.current.setData(indRes.data.filter(i => i.rsi != null).map(i => ({ time: i.date, value: Number(i.rsi) })))
       }
       if (macdSr.current) {
-        const macd   = indRes.data.filter(i => i.macd != null).map(i => ({ time: i.date, value: Number(i.macd) }))
-        const signal = indRes.data.filter(i => i.macdSignal != null).map(i => ({ time: i.date, value: Number(i.macdSignal) }))
-        macdSr.current.setData(macd)
-        signalSr.current.setData(signal)
+        macdSr.current.setData(indRes.data.filter(i => i.macd != null).map(i => ({ time: i.date, value: Number(i.macd) })))
+        signalSr.current.setData(indRes.data.filter(i => i.macdSignal != null).map(i => ({ time: i.date, value: Number(i.macdSignal) })))
       }
 
-      mainChart.current.timeScale().fitContent()
-      setCurrentPrice(priceRes.data[priceRes.data.length - 1] ?? null)
+      const isCompanyChange = prevSelectedId.current !== selected?.id
+      prevSelectedId.current = selected?.id
+      if (isCompanyChange) {
+        mainChart.current.timeScale().fitContent()
+      } else {
+        mainChart.current.timeScale().scrollToRealTime()
+      }
+      const last = priceRes.data[priceRes.data.length - 1] ?? null
+      const prev = priceRes.data[priceRes.data.length - 2] ?? null
+      setCurrentPrice(last)
+      setPrevClose(prev ? Number(prev.close) : null)
     }).catch(() => {})
   }, [selected, simDate, startDate])
 
+  // ── 토글 함수 ─────────────────────────────────────────────
   const toggleMA = (p) => {
     const next = !showMA[p]
-    setShowMA(prev => ({ ...prev, [p]: next }))
+    const updated = { ...showMA, [p]: next }
+    setShowMA(updated)
+    persist({ showMA: updated })
     maSr.current[p]?.applyOptions({ visible: next })
   }
   const toggleBB = () => {
     const next = !showBB
-    setShowBB(next)
+    setShowBB(next); persist({ showBB: next })
     bbUpperSr.current?.applyOptions({ visible: next })
     bbLowerSr.current?.applyOptions({ visible: next })
   }
   const toggleIchi = () => {
     const next = !showIchi
-    setShowIchi(next)
+    setShowIchi(next); persist({ showIchi: next })
     Object.values(ichiSr.current).forEach(s => s?.applyOptions({ visible: next }))
+  }
+  const toggleVol = () => {
+    const next = !showVol
+    setShowVol(next); persist({ showVol: next })
+    volSr.current?.applyOptions({ visible: next })
+  }
+  const toggleRSI = () => {
+    const next = !showRSI
+    setShowRSI(next); persist({ showRSI: next })
+  }
+  const toggleMACD = () => {
+    const next = !showMACD
+    setShowMACD(next); persist({ showMACD: next })
   }
 
   function syncCharts(a, b) {
@@ -242,7 +325,11 @@ export default function PriceTab({ state, startDate }) {
   }
 
   const price = currentPrice
-  const up = price ? Number(price.close) >= Number(price.open) : true
+  const closeNum = price ? Number(price.close) : 0
+  const dayChgPct = (prevClose && prevClose > 0)
+    ? ((closeNum - prevClose) / prevClose) * 100
+    : ((price && Number(price.open) > 0) ? ((closeNum - Number(price.open)) / Number(price.open)) * 100 : 0)
+  const up = dayChgPct >= 0
 
   return (
     <div style={s.root}>
@@ -263,18 +350,22 @@ export default function PriceTab({ state, startDate }) {
 
       {/* 지표 토글 */}
       <div style={s.indRow}>
-        <span style={s.indGroup}>
-          {[5, 20, 60].map(p => (
-            <button key={p} style={{ ...s.indChip, ...(showMA[p] ? { borderColor: MA_COLORS[p] + 'bb', color: MA_COLORS[p] } : {}) }}
-              onClick={() => toggleMA(p)}>MA{p}</button>
-          ))}
-          <button style={{ ...s.indChip, ...(showBB ? s.bbOn : {}) }} onClick={toggleBB}>BB</button>
-          <button style={{ ...s.indChip, ...(showIchi ? s.ichiOn : {}) }} onClick={toggleIchi}>일목</button>
+        <span style={s.group}>
+          <button style={{ ...s.ind, ...(showVol ? s.volOn : {}) }} onClick={toggleVol}>거래량</button>
         </span>
         <div style={s.sep} />
-        <span style={s.indGroup}>
-          <button style={{ ...s.indChip, ...(showRSI ? s.rsiOn : {}) }} onClick={() => setShowRSI(v => !v)}>RSI</button>
-          <button style={{ ...s.indChip, ...(showMACD ? s.macdOn : {}) }} onClick={() => setShowMACD(v => !v)}>MACD</button>
+        <span style={s.group}>
+          {[5, 20, 60].map(p => (
+            <button key={p} style={{ ...s.ind, ...(showMA[p] ? { borderColor: MA_COLORS[p] + 'bb', color: MA_COLORS[p] } : {}) }}
+              onClick={() => toggleMA(p)}>MA{p}</button>
+          ))}
+          <button style={{ ...s.ind, ...(showBB ? s.bbOn : {}) }} onClick={toggleBB}>BB</button>
+          <button style={{ ...s.ind, ...(showIchi ? s.ichiOn : {}) }} onClick={toggleIchi}>일목</button>
+        </span>
+        <div style={s.sep} />
+        <span style={s.group}>
+          <button style={{ ...s.ind, ...(showRSI ? s.rsiOn : {}) }} onClick={toggleRSI}>RSI</button>
+          <button style={{ ...s.ind, ...(showMACD ? s.macdOn : {}) }} onClick={toggleMACD}>MACD</button>
         </span>
       </div>
 
@@ -282,8 +373,8 @@ export default function PriceTab({ state, startDate }) {
       {price && (
         <div style={s.priceRow}>
           <span style={{ color: up ? upColor : dnColor, fontSize: 22, fontWeight: 700, letterSpacing: '-0.5px' }}>{fmt(price.close)}</span>
-          <span style={{ color: up ? upColor : dnColor, fontSize: 12, fontWeight: 600 }}>{up ? '▲' : '▼'} {Math.abs(((Number(price.close) - Number(price.open)) / Number(price.open)) * 100).toFixed(2)}%</span>
-          <span style={{ color: '#3a3a3a', fontSize: 11 }}>H {fmt(price.high)} · L {fmt(price.low)} · {fmtNum(price.volume)}</span>
+          <span style={{ color: up ? upColor : dnColor, fontSize: 12, fontWeight: 600 }}>{up ? '▲' : '▼'} {Math.abs(dayChgPct).toFixed(2)}%</span>
+          <span style={{ color: '#9ca3af', fontSize: 11 }}>H {fmt(price.high)} · L {fmt(price.low)} · {fmtNum(price.volume)}</span>
         </div>
       )}
 
@@ -295,7 +386,7 @@ export default function PriceTab({ state, startDate }) {
         <div style={s.panel}>
           <div style={s.panelHdr}>
             <span style={{ color: '#a78bfa', fontWeight: 700 }}>RSI 14</span>
-            <span style={{ color: '#333' }}>· 70 과매수 / 30 과매도</span>
+            <span style={{ color: '#9ca3af' }}>· 70 과매수 / 30 과매도</span>
           </div>
           <div ref={rsiDiv} style={{ flex: 1, minHeight: 0 }} />
         </div>
@@ -312,6 +403,28 @@ export default function PriceTab({ state, startDate }) {
           <div ref={macdDiv} style={{ flex: 1, minHeight: 0 }} />
         </div>
       )}
+
+      {/* 매수/매도 버튼 */}
+      {selected && (
+        <div style={s.tradeRow}>
+          <button style={s.buyBtn}  onClick={() => setOrderTab('BUY')}>매수</button>
+          <button style={s.sellBtn} onClick={() => setOrderTab('SELL')}>매도</button>
+        </div>
+      )}
+
+      {/* 바텀시트 주문창 */}
+      {orderTab && (
+        <OrderBottomSheet
+          company={selected}
+          price={currentPrice}
+          portfolio={portfolio}
+          holdings={holdings}
+          sessionId={sessionId}
+          onTraded={onTraded}
+          onClose={() => setOrderTab(null)}
+          initialTab={orderTab}
+        />
+      )}
     </div>
   )
 }
@@ -319,19 +432,23 @@ export default function PriceTab({ state, startDate }) {
 const s = {
   root:       { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', gap: 6 },
   companyRow: { display: 'flex', flexWrap: 'wrap', gap: 4, flexShrink: 0 },
-  chip:       { background: '#161616', border: '1px solid #252525', borderRadius: 6, padding: '4px 8px', color: '#555', fontSize: 11, fontWeight: 700, cursor: 'pointer', position: 'relative' },
-  chipActive: { borderColor: '#4ade80', color: '#4ade80' },
-  chipHeld:   { borderColor: '#f59e0b44', color: '#777' },
+  chip:       { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', color: '#9ca3af', fontSize: 11, fontWeight: 700, cursor: 'pointer', position: 'relative' },
+  chipActive: { borderColor: '#22c55e', color: '#16a34a' },
+  chipHeld:   { borderColor: '#fcd34d', color: '#92400e' },
   dot:        { position: 'absolute', top: 2, right: 2, width: 4, height: 4, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' },
-  indRow:     { display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 },
-  indGroup:   { display: 'flex', gap: 4 },
-  indChip:    { background: '#161616', border: '1px solid #252525', borderRadius: 5, padding: '3px 7px', color: '#444', fontSize: 10, fontWeight: 700, cursor: 'pointer' },
-  sep:        { width: 1, height: 12, background: '#2a2a2a' },
-  bbOn:       { borderColor: '#8b5cf688', color: '#8b5cf6' },
-  ichiOn:     { borderColor: '#e879f988', color: '#e879f9' },
-  rsiOn:      { borderColor: '#a78bfa88', color: '#a78bfa' },
-  macdOn:     { borderColor: '#60a5fa88', color: '#60a5fa' },
+  indRow:     { display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 },
+  group:      { display: 'flex', gap: 4 },
+  sep:        { width: 1, height: 12, background: '#e5e7eb' },
+  ind:        { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 5, padding: '3px 7px', color: '#9ca3af', fontSize: 10, fontWeight: 700, cursor: 'pointer' },
+  volOn:      { borderColor: '#64748b', color: '#475569' },
+  bbOn:       { borderColor: '#8b5cf6', color: '#7c3aed' },
+  ichiOn:     { borderColor: '#d946ef', color: '#a21caf' },
+  rsiOn:      { borderColor: '#a78bfa', color: '#7c3aed' },
+  macdOn:     { borderColor: '#60a5fa', color: '#2563eb' },
   priceRow:   { display: 'flex', alignItems: 'baseline', gap: 8, flexShrink: 0 },
-  panel:      { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, borderTop: '1px solid #1a1a1a' },
+  panel:      { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, borderTop: '1px solid #e5e7eb' },
   panelHdr:   { display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0', fontSize: 10, flexShrink: 0 },
+  tradeRow:   { display: 'flex', gap: 8, flexShrink: 0 },
+  buyBtn:     { flex: 1, background: '#f43f5e', border: 'none', borderRadius: 8, padding: '12px 0', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' },
+  sellBtn:    { flex: 1, background: '#3b82f6', border: 'none', borderRadius: 8, padding: '12px 0', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' },
 }

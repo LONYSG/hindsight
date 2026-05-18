@@ -96,7 +96,7 @@ export default function ResultPage() {
               <div style={s.barTrack}>
                 <div style={{ ...s.barFill, width: `${barW}%`, background: color }} />
               </div>
-              <div style={{ ...s.barValue, color: isMine ? rateColor(val) : '#888' }}>
+              <div style={{ ...s.barValue, color: isMine ? rateColor(val) : '#9ca3af' }}>
                 {pct(result[key])}
               </div>
             </div>
@@ -183,52 +183,52 @@ function getBehaviorText(result) {
 
 function InfoRow({ label, value, color, last }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: last ? 'none' : '1px solid #1e1e1e' }}>
-      <span style={{ color: '#666', fontSize: 13 }}>{label}</span>
-      <span style={{ color: color || '#bbb', fontSize: 13, fontWeight: 500 }}>{value}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: last ? 'none' : '1px solid #f3f4f6' }}>
+      <span style={{ color: '#6b7280', fontSize: 13 }}>{label}</span>
+      <span style={{ color: color || '#374151', fontSize: 13, fontWeight: 500 }}>{value}</span>
     </div>
   )
 }
 
 const s = {
-  root:         { minHeight: '100vh', background: '#0f0f0f', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 12 },
-  center:       { color: '#888', textAlign: 'center', marginTop: 100, fontSize: 14 },
+  root:         { minHeight: '100vh', background: '#f5f6f8', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 12 },
+  center:       { color: '#9ca3af', textAlign: 'center', marginTop: 100, fontSize: 14 },
   header:       { marginBottom: 4 },
-  headerTitle:  { color: '#e8e8e8', fontSize: 20, fontWeight: 700, letterSpacing: '-0.3px' },
-  headerSub:    { color: '#555', fontSize: 12, marginTop: 4 },
+  headerTitle:  { color: '#111827', fontSize: 20, fontWeight: 700, letterSpacing: '-0.3px' },
+  headerSub:    { color: '#6b7280', fontSize: 12, marginTop: 4 },
 
-  assetCard:    { background: '#161616', borderRadius: 12, padding: '16px' },
+  assetCard:    { background: '#fff', borderRadius: 12, padding: '16px', border: '1px solid #e8eaed' },
   assetRow:     { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' },
-  assetLabel:   { color: '#666', fontSize: 13 },
-  assetValue:   { color: '#e8e8e8', fontSize: 16, fontWeight: 600 },
+  assetLabel:   { color: '#6b7280', fontSize: 13 },
+  assetValue:   { color: '#111827', fontSize: 16, fontWeight: 600 },
 
-  alphaCard:    { background: '#161616', borderRadius: 12, padding: '20px 16px', border: '1px solid' },
+  alphaCard:    { background: '#fff', borderRadius: 12, padding: '20px 16px', border: '1px solid' },
   myReturnRow:  { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 },
-  myReturnLabel:{ color: '#888', fontSize: 13 },
+  myReturnLabel:{ color: '#6b7280', fontSize: 13 },
   myReturnValue:{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.5px' },
-  alphaRow:     { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 10, borderTop: '1px solid #252525' },
-  alphaLabel:   { color: '#666', fontSize: 12 },
+  alphaRow:     { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 10, borderTop: '1px solid #f3f4f6' },
+  alphaLabel:   { color: '#6b7280', fontSize: 12 },
   alphaValue:   { fontSize: 20, fontWeight: 700 },
   verdict:      { textAlign: 'center', marginTop: 14, fontSize: 15, fontWeight: 600 },
 
-  card:         { background: '#161616', borderRadius: 12, padding: '16px' },
-  sectionLabel: { color: '#555', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
+  card:         { background: '#fff', borderRadius: 12, padding: '16px', border: '1px solid #e8eaed' },
+  sectionLabel: { color: '#9ca3af', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
 
   barRow:       { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 },
-  barLabel:     { color: '#888', fontSize: 12, width: 60, flexShrink: 0 },
-  barTrack:     { flex: 1, height: 8, background: '#252525', borderRadius: 4, overflow: 'hidden' },
+  barLabel:     { color: '#6b7280', fontSize: 12, width: 60, flexShrink: 0 },
+  barTrack:     { flex: 1, height: 8, background: '#f3f4f6', borderRadius: 4, overflow: 'hidden' },
   barFill:      { height: '100%', borderRadius: 4, transition: 'width 0.6s ease' },
   barValue:     { fontSize: 13, fontWeight: 600, width: 60, textAlign: 'right', flexShrink: 0 },
 
-  infoRow:      { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #1e1e1e' },
-  infoLabel:    { color: '#666', fontSize: 13 },
-  infoValue:    { color: '#bbb', fontSize: 13, fontWeight: 500 },
+  infoRow:      { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f3f4f6' },
+  infoLabel:    { color: '#6b7280', fontSize: 13 },
+  infoValue:    { color: '#374151', fontSize: 13, fontWeight: 500 },
 
-  replayBtn:    { background: '#4ade80', color: '#000', border: 'none', borderRadius: 10, padding: '14px', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginTop: 4 },
-  behaviorLine: { color: '#aaa', fontSize: 13, lineHeight: 1.7, margin: '4px 0' },
+  replayBtn:    { background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, padding: '14px', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginTop: 4 },
+  behaviorLine: { color: '#374151', fontSize: 13, lineHeight: 1.7, margin: '4px 0' },
   themeRow:     { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 },
-  themeLabel:   { color: '#888', fontSize: 12, width: 110, flexShrink: 0 },
-  themeTrack:   { flex: 1, height: 6, background: '#252525', borderRadius: 3, overflow: 'hidden' },
+  themeLabel:   { color: '#6b7280', fontSize: 12, width: 110, flexShrink: 0 },
+  themeTrack:   { flex: 1, height: 6, background: '#f3f4f6', borderRadius: 3, overflow: 'hidden' },
   themeFill:    { height: '100%', background: '#6366f1', borderRadius: 3 },
-  themeCount:   { color: '#555', fontSize: 11, width: 28, textAlign: 'right', flexShrink: 0 },
+  themeCount:   { color: '#9ca3af', fontSize: 11, width: 28, textAlign: 'right', flexShrink: 0 },
 }

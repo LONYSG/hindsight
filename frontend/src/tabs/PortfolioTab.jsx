@@ -59,9 +59,9 @@ function HoldingCard({ h }) {
 
 function Item({ label, value, last }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderBottom: last ? 'none' : '1px solid #1e1e1e' }}>
-      <span style={{ color: '#666', fontSize: 13 }}>{label}</span>
-      <span style={{ color: '#e8e8e8', fontSize: 14, fontWeight: 500 }}>{value}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderBottom: last ? 'none' : '1px solid #f3f4f6' }}>
+      <span style={{ color: '#6b7280', fontSize: 13 }}>{label}</span>
+      <span style={{ color: '#111827', fontSize: 14, fontWeight: 500 }}>{value}</span>
     </div>
   )
 }
@@ -69,22 +69,22 @@ function Item({ label, value, last }) {
 function HItem({ label, value, color }) {
   return (
     <div>
-      <div style={{ color: '#555', fontSize: 11, marginBottom: 3 }}>{label}</div>
-      <div style={{ color: color || '#ccc', fontSize: 13, fontWeight: 500 }}>{value}</div>
+      <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 3 }}>{label}</div>
+      <div style={{ color: color || '#374151', fontSize: 13, fontWeight: 500 }}>{value}</div>
     </div>
   )
 }
 
 const s = {
   root:         { display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' },
-  totalCard:    { background: '#161616', borderRadius: 12, padding: '20px 16px', textAlign: 'center' },
-  totalLabel:   { color: '#555', fontSize: 12, marginBottom: 8 },
-  totalValue:   { color: '#e8e8e8', fontSize: 30, fontWeight: 700, letterSpacing: '-0.5px' },
-  section:      { background: '#161616', borderRadius: 12, overflow: 'hidden' },
-  sectionTitle: { color: '#555', fontSize: 11, padding: '12px 14px 6px', textTransform: 'uppercase', letterSpacing: 0.5 },
-  holdCard:     { padding: '12px 14px', borderBottom: '1px solid #1a1a1a' },
+  totalCard:    { background: '#fff', borderRadius: 12, padding: '20px 16px', textAlign: 'center' },
+  totalLabel:   { color: '#9ca3af', fontSize: 12, marginBottom: 8 },
+  totalValue:   { color: '#111827', fontSize: 30, fontWeight: 700, letterSpacing: '-0.5px' },
+  section:      { background: '#fff', borderRadius: 12, overflow: 'hidden' },
+  sectionTitle: { color: '#9ca3af', fontSize: 11, padding: '12px 14px 6px', textTransform: 'uppercase', letterSpacing: 0.5 },
+  holdCard:     { padding: '12px 14px', borderBottom: '1px solid #f3f4f6' },
   holdTop:      { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  ticker:       { color: '#e8e8e8', fontWeight: 700, fontSize: 15 },
+  ticker:       { color: '#111827', fontWeight: 700, fontSize: 15 },
   holdGrid:     { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
-  emptyHold:    { color: '#333', textAlign: 'center', fontSize: 13, paddingTop: 8 },
+  emptyHold:    { color: '#9ca3af', textAlign: 'center', fontSize: 13, paddingTop: 8 },
 }

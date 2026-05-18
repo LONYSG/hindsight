@@ -36,6 +36,7 @@ public record SessionStateResponse(
 
     public record EventInfo(
             String eventType,
+            String companyTicker,
             String summary
     ) {}
 }

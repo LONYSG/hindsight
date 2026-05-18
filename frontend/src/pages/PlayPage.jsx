@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { getState, nextDay, endSession } from '../api/play'
 import { useIsMobile } from '../hooks/useIsMobile'
@@ -7,17 +7,27 @@ import OrderTab     from '../tabs/OrderTab'
 import PortfolioTab from '../tabs/PortfolioTab'
 import NewsTab      from '../tabs/NewsTab'
 
-const EVENT_META = {
-  PRICE_SPIKE:  { label: '주가급변',  color: '#f59e0b' },
-  VOLUME_SPIKE: { label: '거래량급증', color: '#818cf8' },
-  FOMC:         { label: 'FOMC',      color: '#34d399' },
-  CPI:          { label: 'CPI',       color: '#34d399' },
-  EARNINGS:     { label: '실적발표',  color: '#60a5fa' },
+const DAYS = ['일', '월', '화', '수', '목', '금', '토']
+function formatDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const day = DAYS[new Date(y, m - 1, d).getDay()]
+  return `${y}.${String(m).padStart(2,'0')}.${String(d).padStart(2,'0')} (${day})`
+}
+
+function formatEvent(e) {
+  const t = e.companyTicker
+  switch (e.eventType) {
+    case 'PRICE_SPIKE':  return { icon: '📈', text: t ? `${t} 주가급변` : '주가급변',    color: '#ef4444' }
+    case 'VOLUME_SPIKE': return { icon: '📊', text: t ? `${t} 거래량급증` : '거래량급증', color: '#6366f1' }
+    case 'FOMC':         return { icon: '🏦', text: 'FOMC 금리 결정',                    color: '#10b981' }
+    case 'CPI':          return { icon: '📉', text: 'CPI 물가 발표',                     color: '#10b981' }
+    case 'EARNINGS':     return { icon: '💰', text: e.summary || (t ? `${t} 실적발표` : '실적발표'), color: '#3b82f6' }
+    default:             return { icon: '🔔', text: e.eventType,                          color: '#9ca3af' }
+  }
 }
 
 const TABS = [
   { key: 'price',     label: '시세' },
-  { key: 'order',     label: '주문' },
   { key: 'portfolio', label: '잔고' },
   { key: 'news',      label: '뉴스' },
 ]
@@ -29,22 +39,23 @@ const JUMP_TYPES = [
   { key: 'THREE_MONTHS', label: '3달' },
 ]
 
-// 고정 높이 상수
-const HEADER_H  = 56
-const TABBAR_H  = 44
-const FOOTER_H  = 56
+const HEADER_H = 52
+const TABBAR_H = 42
+const FOOTER_H = 52
 
 export default function PlayPage() {
   const { sessionId } = useParams()
   const location = useLocation()
   const isMobile = useIsMobile()
-
   const navigate = useNavigate()
-  const [state, setState] = useState(location.state?.initialState || null)
-  const [loading, setLoading] = useState(!location.state?.initialState)
+  const bellRef  = useRef(null)
+
+  const [state, setState]         = useState(location.state?.initialState || null)
+  const [loading, setLoading]     = useState(!location.state?.initialState)
   const [activeTab, setActiveTab] = useState('price')
-  const [jumping, setJumping] = useState(false)
-  const [ending, setEnding] = useState(false)
+  const [jumping, setJumping]     = useState(false)
+  const [ending, setEnding]       = useState(false)
+  const [bellOpen, setBellOpen]   = useState(false)
 
   const startDate = location.state?.startDate || '2020-02-01'
 
@@ -53,6 +64,13 @@ export default function PlayPage() {
       getState(sessionId).then((r) => setState(r.data)).finally(() => setLoading(false))
     }
   }, [sessionId])
+
+  useEffect(() => {
+    if (!bellOpen) return
+    const handler = (e) => { if (bellRef.current && !bellRef.current.contains(e.target)) setBellOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [bellOpen])
 
   const handleEnd = async () => {
     if (!window.confirm('게임을 종료하고 결과를 확인할까요?')) return
@@ -79,28 +97,38 @@ export default function PlayPage() {
   if (!state)  return <div style={s.center}>데이터 없음</div>
 
   const { simDate, events } = state
-  const hasEvents = events.length > 0
   const contentH = `calc(100vh - ${HEADER_H + TABBAR_H + FOOTER_H}px)`
 
   return (
     <div style={s.root}>
 
-      {/* ── 헤더: 날짜 + 이벤트 배지 ── */}
+      {/* 헤더 */}
       <div style={{ ...s.header, height: HEADER_H }}>
-        <div style={s.headerLeft}>
-          <span style={s.dateLabel}>시뮬레이션 날짜</span>
-          <span style={s.date}>{simDate}</span>
-        </div>
+        <span style={s.date}>{formatDate(simDate)}</span>
         <div style={s.headerRight}>
-          <div style={s.badges}>
-            {events.map((e, i) => {
-            const m = EVENT_META[e.eventType] || { label: e.eventType, color: '#888' }
-            return (
-              <span key={i} style={{ ...s.badge, background: m.color + '22', color: m.color, border: `1px solid ${m.color}44` }}>
-                🔔 {m.label}
-              </span>
-            )
-            })}
+          <div ref={bellRef} style={{ position: 'relative' }}>
+            <button style={s.bellBtn} onClick={() => setBellOpen(v => !v)}>
+              <span style={s.bellIcon}>🔔</span>
+              {events.length > 0 && <span style={s.bellBadge}>{events.length}</span>}
+            </button>
+            {bellOpen && (
+              <div style={s.notifPanel}>
+                <div style={s.notifTitle}>오늘의 이벤트</div>
+                {events.length === 0 ? (
+                  <div style={s.notifEmpty}>이벤트 없음</div>
+                ) : (
+                  events.map((e, i) => {
+                    const fmt = formatEvent(e)
+                    return (
+                      <div key={i} style={s.notifItem}>
+                        <span style={s.notifIconEl}>{fmt.icon}</span>
+                        <div style={{ ...s.notifText, color: fmt.color }}>{fmt.text}</div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            )}
           </div>
           <button style={s.endBtn} onClick={handleEnd} disabled={ending}>
             {ending ? '...' : '종료'}
@@ -108,41 +136,35 @@ export default function PlayPage() {
         </div>
       </div>
 
-      {/* ── 탭바 ── */}
+      {/* 탭바 */}
       <div style={{ ...s.tabBar, height: TABBAR_H }}>
-        {TABS.map(({ key, label }) => {
-          const isNews    = key === 'news'
-          const newsAlert = isNews  // 매일 뉴스 있음
-          return (
-            <button
-              key={key}
-              style={activeTab === key ? { ...s.tabBtn, ...s.tabActive } : s.tabBtn}
-              onClick={() => setActiveTab(key)}
-            >
-              {label}
-              {newsAlert && <span style={s.dot} />}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* ── 탭 컨텐츠 ── */}
-      <div style={{ ...s.content, height: contentH, maxWidth: isMobile ? '100%' : 760, margin: '0 auto', width: '100%', overflow: activeTab === 'price' ? 'hidden' : 'auto' }}>
-        {activeTab === 'price'     && <PriceTab     state={state} startDate={startDate} />}
-        {activeTab === 'order'     && <OrderTab     state={state} sessionId={sessionId} onTraded={setState} />}
-        {activeTab === 'portfolio' && <PortfolioTab state={state} />}
-        {activeTab === 'news'      && <NewsTab      events={events} simDate={simDate} sessionId={sessionId} />}
-      </div>
-
-      {/* ── 하단 고정: 날짜 이동 ── */}
-      <div style={{ ...s.footer, height: FOOTER_H }}>
-        {JUMP_TYPES.map(({ key, label }) => (
+        {TABS.map(({ key, label }) => (
           <button
             key={key}
-            style={s.jumpBtn}
-            onClick={() => handleNext(key)}
-            disabled={jumping}
+            style={activeTab === key ? { ...s.tabBtn, ...s.tabActive } : s.tabBtn}
+            onClick={() => setActiveTab(key)}
           >
+            {label}
+            {key === 'news' && <span style={s.dot} />}
+          </button>
+        ))}
+      </div>
+
+      {/* 탭 컨텐츠 */}
+      <div style={{
+        ...s.content, height: contentH,
+        maxWidth: isMobile ? '100%' : 760, margin: '0 auto', width: '100%',
+        overflow: activeTab === 'price' ? 'hidden' : 'auto',
+      }}>
+        {activeTab === 'price'     && <PriceTab     state={state} startDate={startDate} sessionId={sessionId} onTraded={setState} />}
+        {activeTab === 'portfolio' && <PortfolioTab state={state} />}
+        {activeTab === 'news'      && <NewsTab      simDate={simDate} sessionId={sessionId} />}
+      </div>
+
+      {/* 하단: 날짜 이동 */}
+      <div style={{ ...s.footer, height: FOOTER_H }}>
+        {JUMP_TYPES.map(({ key, label }) => (
+          <button key={key} style={s.jumpBtn} onClick={() => handleNext(key)} disabled={jumping}>
             {jumping ? '·' : label}
           </button>
         ))}
@@ -153,29 +175,33 @@ export default function PlayPage() {
 }
 
 const s = {
-  root:       { height: '100vh', display: 'flex', flexDirection: 'column', background: '#0f0f0f', overflow: 'hidden' },
-  center:     { color: '#888', textAlign: 'center', marginTop: 100 },
+  root:       { height: '100vh', display: 'flex', flexDirection: 'column', background: '#f5f6f8', overflow: 'hidden' },
+  center:     { color: '#9ca3af', textAlign: 'center', marginTop: 100 },
 
-  // 헤더
-  header:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', borderBottom: '1px solid #1e1e1e', flexShrink: 0 },
-  headerLeft: { display: 'flex', flexDirection: 'column', gap: 2 },
-  dateLabel:  { color: '#555', fontSize: 10, letterSpacing: 0.5 },
-  date:       { color: '#e8e8e8', fontSize: 17, fontWeight: 600 },
+  header:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', background: '#fff', borderBottom: '1px solid #e8eaed', flexShrink: 0 },
+  date:       { color: '#111827', fontSize: 15, fontWeight: 600, letterSpacing: '-0.2px' },
   headerRight:{ display: 'flex', alignItems: 'center', gap: 8 },
-  badges:     { display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
-  endBtn:     { background: 'none', border: '1px solid #333', borderRadius: 6, color: '#888', fontSize: 12, padding: '4px 10px', cursor: 'pointer' },
-  badge:      { borderRadius: 4, padding: '3px 8px', fontSize: 11, fontWeight: 600 },
 
-  // 탭바
-  tabBar:     { display: 'flex', borderBottom: '1px solid #1e1e1e', flexShrink: 0 },
-  tabBtn:     { flex: 1, background: 'none', border: 'none', color: '#555', fontSize: 13, fontWeight: 500, cursor: 'pointer', position: 'relative' },
-  tabActive:  { color: '#e8e8e8', borderBottom: '2px solid #e8e8e8' },
+  bellBtn:    { position: 'relative', background: 'none', border: '1px solid #e8eaed', borderRadius: 8, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, flexShrink: 0 },
+  bellIcon:   { fontSize: 15, lineHeight: 1 },
+  bellBadge:  { position: 'absolute', top: -5, right: -5, background: '#ef4444', color: '#fff', borderRadius: '50%', width: 17, height: 17, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' },
+
+  notifPanel:  { position: 'absolute', top: 42, right: 0, width: 210, background: '#fff', border: '1px solid #e8eaed', borderRadius: 12, boxShadow: '0 6px 24px rgba(0,0,0,0.1)', zIndex: 200, overflow: 'hidden' },
+  notifTitle:  { fontSize: 11, fontWeight: 700, color: '#9ca3af', padding: '10px 14px 8px', borderBottom: '1px solid #f3f4f6', letterSpacing: 0.3 },
+  notifEmpty:  { fontSize: 13, color: '#9ca3af', padding: '12px 14px' },
+  notifItem:   { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: '1px solid #f9fafb' },
+  notifIconEl: { fontSize: 16, flexShrink: 0 },
+  notifText:   { fontSize: 13, fontWeight: 600, lineHeight: 1.3 },
+
+  endBtn:     { background: 'none', border: '1px solid #e8eaed', borderRadius: 8, color: '#6b7280', fontSize: 12, fontWeight: 500, padding: '6px 12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 },
+
+  tabBar:     { display: 'flex', background: '#fff', borderBottom: '1px solid #e8eaed', flexShrink: 0 },
+  tabBtn:     { flex: 1, background: 'none', border: 'none', borderBottom: '2px solid transparent', color: '#9ca3af', fontSize: 13, fontWeight: 500, cursor: 'pointer', position: 'relative' },
+  tabActive:  { color: '#111827', borderBottom: '2px solid #111827', fontWeight: 700 },
   dot:        { position: 'absolute', top: 8, right: '28%', width: 5, height: 5, borderRadius: '50%', background: '#f59e0b' },
 
-  // 컨텐츠
-  content:    { flex: 1, overflowY: 'auto', padding: '16px', minHeight: 0 },
+  content:    { flex: 1, overflowY: 'auto', padding: '12px 16px', minHeight: 0 },
 
-  // 푸터
-  footer:     { display: 'flex', borderTop: '1px solid #1e1e1e', flexShrink: 0 },
-  jumpBtn:    { flex: 1, background: 'none', border: 'none', color: '#888', fontSize: 13, fontWeight: 500, cursor: 'pointer', borderRight: '1px solid #1e1e1e' },
+  footer:     { display: 'flex', background: '#fff', borderTop: '1px solid #e8eaed', flexShrink: 0 },
+  jumpBtn:    { flex: 1, background: 'none', border: 'none', color: '#6b7280', fontSize: 13, fontWeight: 500, cursor: 'pointer', borderRight: '1px solid #f3f4f6' },
 }

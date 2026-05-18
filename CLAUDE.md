@@ -181,7 +181,7 @@ llm_raw:      text      ← 디버깅용 Gemini 원본 응답 (index: false)
 1 = 관련성은 있으나 중요도가 매우 낮은 뉴스
 ```
 
-UI에서 기본은 importance 3 이상 노출, "약한 신호 보기" 토글로 2점까지 포함.
+UI에서 기본은 importance 3 이상 노출, 4단계 필터 버튼(전체/★★★이상/★★★★이상/★★★★★만)으로 선택.
 
 ### themes 태그 시스템 (28개 flat 구조)
 
@@ -277,16 +277,37 @@ OTHER
   - 로그인/회원가입
   - 메인 플레이 화면 (차트, 뉴스, 매매, 포트폴리오 탭)
 
+### 완료 (2026-05-15 추가)
+- 전체 UI 라이트모드 전환 (Login/Setup/Play/Result + 모든 탭)
+- PlayPage 헤더 재설계
+  - 🔔 종 아이콘 + 드롭다운 알림 패널 (이벤트 상세 표시)
+  - 날짜 한줄 표시: `2020.02.15 (토)` 형식
+  - EventInfo에 companyTicker 추가 → `NVDA 주가급변` 형태
+  - 종료 버튼 + 탭 활성 표시기 버그 수정
+- PriceTab 일간 변동률 수정 (시가 기준 → 전일 종가 기준)
+- 차트 줌 레벨 유지 (날짜 점프 시 scrollToRealTime 사용)
+- 바텀시트 주문창 maxWidth 480px로 수정 (셸 너비 일치)
+- 뉴스 시스템 전면 개선
+  - look-ahead bias 제거: published_at 범위 쿼리
+  - 주말/공휴일 뉴스 자동 이월 (전 거래일 장마감 ~ 당일 장마감)
+  - DST(서머타임) 반영: EDT 20:00 UTC / EST 21:00 UTC
+  - 정렬: published_at ASC 고정 (시간순)
+  - 날짜 구분선: 토요일/일요일/공휴일/전일 장후 배지
+  - 중요도 필터 버튼 4단계로 교체
+  - NewsResponse DTO: prevTradingDay 포함
+  - summary 프롬프트: 의미 전환 시 \n\n 문단 분리
+  - 비거래일 장전/장중/장후 배지 숨김
+
 ### 진행 중
-- 뉴스 요약 작업 (re_summarize_all) - title_ko + summary + themes 생성 예정
-  - 현재 hindsight-news에 2020년 2월 381건 수집 완료, 요약 미완료
+- 뉴스 요약 재실행 (re_summarize_all) — 새 프롬프트(문단 분리) 적용 필요
+  - 2020년 2월 381건 수집 완료, 요약은 구 프롬프트 상태
 
 ### 미완료 / 다음 작업
-- 뉴스 요약 완료 (re_summarize_all 실행)
-- 결과 화면 (play_result 표시 + MDD + 투자 성향 분석)
+- 뉴스 요약 완료 (re_summarize_all 실행, Gemini 500 req/일 한도 내)
 - FOMC/CPI 캘린더 이벤트 수집 (market_event 테이블)
-- news_view 이벤트 기록 기능 (프론트 + 백엔드)
-- docs/dev-log.md 커밋
+- 멀티 포트폴리오 실제 플레이 검증 (M7 종목 분산 투자)
+- 결과 화면 MDD 계산 검증
+- 인프라 (docker-compose 정리, GitHub Actions CI/CD)
 
 ---
 

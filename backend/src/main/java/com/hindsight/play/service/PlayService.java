@@ -252,7 +252,10 @@ public class PlayService {
                         returnRate
                 ),
                 events.stream()
-                        .map(e -> new SessionStateResponse.EventInfo(e.getEventType(), e.getSummary()))
+                        .map(e -> new SessionStateResponse.EventInfo(
+                                e.getEventType(),
+                                e.getCompany() != null ? e.getCompany().getTicker() : null,
+                                e.getSummary()))
                         .toList()
         );
     }
