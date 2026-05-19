@@ -18,7 +18,7 @@ export default function LoginPage() {
       if (mode === 'login') {
         const res = await login(email, password)
         localStorage.setItem('token', res.data.accessToken)
-        navigate('/setup')
+        navigate('/home')
       } else {
         await signup(email, password)
         setMode('login')
@@ -51,6 +51,17 @@ export default function LoginPage() {
             회원가입
           </button>
         </div>
+
+        <button type="button" style={styles.kakaoBtn} onClick={() => {
+          const REST_KEY = import.meta.env.VITE_KAKAO_REST_API_KEY
+          const REDIRECT = encodeURIComponent('http://localhost:5173/auth/kakao/callback')
+          window.location.href = `https://kauth.kakao.com/oauth/authorize?client_id=${REST_KEY}&redirect_uri=${REDIRECT}&response_type=code`
+        }}>
+          <img src="https://developers.kakao.com/assets/img/about/logos/kakaolink/kakaolink_btn_small.png" alt="" style={{ width: 18, marginRight: 8 }} />
+          카카오로 시작하기
+        </button>
+
+        <div style={styles.divider}><span>또는</span></div>
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <input
@@ -104,5 +115,7 @@ const styles = {
   form: { display: 'flex', flexDirection: 'column', gap: 10 },
   input: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '11px 14px', color: '#111827', fontSize: 14, outline: 'none' },
   error: { color: '#ef4444', fontSize: 13, margin: 0 },
-  button: { background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 0', fontSize: 15, fontWeight: 600, cursor: 'pointer', marginTop: 4 },
+  button:    { background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 0', fontSize: 15, fontWeight: 600, cursor: 'pointer', marginTop: 4 },
+  kakaoBtn:  { width: '100%', background: '#FEE500', color: '#000000CC', border: 'none', borderRadius: 8, padding: '12px 0', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  divider:   { display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0', color: '#9ca3af', fontSize: 12 },
 }

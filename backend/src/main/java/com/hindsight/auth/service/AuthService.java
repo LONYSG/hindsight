@@ -7,10 +7,18 @@ import com.hindsight.auth.entity.User;
 import com.hindsight.auth.repository.UserRepository;
 import com.hindsight.auth.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +27,16 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
+    private final RestTemplate restTemplate;
+
+    @Value("${kakao.rest-api-key}")
+    private String kakaoRestApiKey;
+
+    @Value("${kakao.client-secret}")
+    private String kakaoClientSecret;
+
+    @Value("${kakao.redirect-uri}")
+    private String kakaoRedirectUri;
 
     @Transactional
     public void signup(SignupRequest request) {
@@ -40,5 +58,64 @@ public class AuthService {
         }
 
         return new TokenResponse(tokenProvider.generateToken(user.getEmail()));
+    }
+
+    @Transactional
+    public TokenResponse kakaoLogin(String code) {
+        String accessToken = fetchKakaoAccessToken(code);
+        Map<String, Object> userInfo = fetchKakaoUserInfo(accessToken);
+
+        Long kakaoId = ((Number) userInfo.get("id")).longValue();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> kakaoAccount = (Map<String, Object>) userInfo.get("kakao_account");
+        String email = kakaoAccount != null ? (String) kakaoAccount.get("email") : null;
+        if (email == null) email = "kakao_" + kakaoId + "@hindsight.local";
+
+        String finalEmail = email;
+        User user = userRepository.findByKakaoId(kakaoId)
+                .orElseGet(() -> userRepository.save(User.ofKakao(kakaoId, finalEmail)));
+
+        return new TokenResponse(tokenProvider.generateToken(user.getEmail()));
+    }
+
+    private String fetchKakaoAccessToken(String code) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("grant_type", "authorization_code");
+        params.add("client_id", kakaoRestApiKey);
+        params.add("client_secret", kakaoClientSecret);
+        params.add("redirect_uri", kakaoRedirectUri);
+        params.add("code", code);
+
+        try {
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                    "https://kauth.kakao.com/oauth/token",
+                    new HttpEntity<>(params, headers),
+                    Map.class
+            );
+            return (String) response.getBody().get("access_token");
+        } catch (HttpClientErrorException e) {
+            throw new IllegalArgumentException("카카오 인증 코드가 유효하지 않습니다: " + e.getResponseBodyAsString());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> fetchKakaoUserInfo(String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    "https://kapi.kakao.com/v2/user/me",
+                    HttpMethod.GET,
+                    new HttpEntity<>(headers),
+                    Map.class
+            );
+            return response.getBody();
+        } catch (HttpClientErrorException e) {
+            throw new IllegalArgumentException("카카오 사용자 정보 조회 실패: " + e.getResponseBodyAsString());
+        }
     }
 }

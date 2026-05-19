@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getResult, getNewsViewThemes } from '../api/play'
+import AppHeader from '../components/AppHeader'
 
 const fmt = (n, d = 2) => '$' + Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d })
 const pct = (r) => { const v = (Number(r ?? 0) * 100); return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%` }
@@ -46,9 +47,12 @@ export default function ResultPage() {
   return (
     <div style={s.root}>
 
-      {/* 헤더 */}
+      <AppHeader title="투자 결과 리포트" />
+
+      <div style={{ padding: '16px 16px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+      {/* 서브 헤더 */}
       <div style={s.header}>
-        <div style={s.headerTitle}>투자 결과 리포트</div>
         <div style={s.headerSub}>{result.startDate} → {result.endDate} ({days}일)</div>
       </div>
 
@@ -176,6 +180,7 @@ export default function ResultPage() {
         다시 하기
       </button>
 
+      </div>
     </div>
   )
 }
@@ -257,7 +262,7 @@ function InfoRow({ label, value, color, last }) {
 }
 
 const s = {
-  root:         { minHeight: '100vh', background: '#f5f6f8', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 12 },
+  root:         { minHeight: '100vh', background: '#f5f6f8', display: 'flex', flexDirection: 'column' },
   center:       { color: '#9ca3af', textAlign: 'center', marginTop: 100, fontSize: 14 },
   loadingWrap:  { minHeight: '100vh', background: '#f5f6f8', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 },
   spinner:      { width: 36, height: 36, border: '3px solid #e5e7eb', borderTop: '3px solid #16a34a', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },

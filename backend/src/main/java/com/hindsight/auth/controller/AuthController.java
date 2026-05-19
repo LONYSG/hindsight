@@ -1,5 +1,6 @@
 package com.hindsight.auth.controller;
 
+import com.hindsight.auth.dto.KakaoLoginRequest;
 import com.hindsight.auth.dto.LoginRequest;
 import com.hindsight.auth.dto.SignupRequest;
 import com.hindsight.auth.dto.TokenResponse;
@@ -25,5 +26,10 @@ public class AuthController {
     @PostMapping("/login")
     public TokenResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request);
+    }
+
+    @PostMapping("/kakao")
+    public TokenResponse kakaoLogin(@RequestBody KakaoLoginRequest request) {
+        return authService.kakaoLogin(request.code());
     }
 }

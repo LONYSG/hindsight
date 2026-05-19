@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getStartPoints } from '../api/data'
 import { startSession } from '../api/play'
+import AppHeader from '../components/AppHeader'
 
 export default function SetupPage() {
   const navigate = useNavigate()
@@ -35,8 +36,8 @@ export default function SetupPage() {
 
   return (
     <div style={s.container}>
+      <AppHeader title="새 시뮬레이션" />
       <div style={s.inner}>
-        <h2 style={s.title}>시뮬레이션 설정</h2>
 
         <section style={s.section}>
           <h3 style={s.label}>시나리오 선택</h3>
@@ -81,9 +82,8 @@ export default function SetupPage() {
 }
 
 const s = {
-  container: { minHeight: '100vh', background: '#f5f6f8', padding: '32px 16px' },
-  inner:     { maxWidth: 720, margin: '0 auto' },
-  title:     { color: '#111827', fontSize: 20, fontWeight: 600, marginBottom: 24, letterSpacing: '-0.3px' },
+  container: { minHeight: '100vh', background: '#f5f6f8' },
+  inner:     { maxWidth: 480, margin: '0 auto', padding: '20px 16px' },
   section:   { marginBottom: 24 },
   label:     { color: '#9ca3af', fontSize: 11, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 },
   cardGrid:  { display: 'flex', gap: 8, flexWrap: 'wrap' },

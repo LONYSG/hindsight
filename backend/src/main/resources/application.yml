@@ -26,6 +26,11 @@ jwt:
   secret: hindsight-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256
   expiration-ms: 86400000         # 24시간
 
+kakao:
+  rest-api-key: ${KAKAO_REST_API_KEY}
+  client-secret: ${KAKAO_CLIENT_SECRET}
+  redirect-uri: http://localhost:5173/auth/kakao/callback
+
 elasticsearch:
   host: localhost
   port: 9200

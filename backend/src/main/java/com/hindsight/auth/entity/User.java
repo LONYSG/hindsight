@@ -21,8 +21,11 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false)
+    @Column
     private String passwordHash;
+
+    @Column(unique = true)
+    private Long kakaoId;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -32,5 +35,13 @@ public class User {
         this.email = email;
         this.passwordHash = passwordHash;
         this.createdAt = LocalDateTime.now();
+    }
+
+    public static User ofKakao(Long kakaoId, String email) {
+        User user = new User();
+        user.kakaoId = kakaoId;
+        user.email = email;
+        user.createdAt = LocalDateTime.now();
+        return user;
     }
 }

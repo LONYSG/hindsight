@@ -1,5 +1,8 @@
 import client from './client'
 
+export const getSessions = () =>
+  client.get('/play/sessions')
+
 export const startSession = (startPointId, seedMoney) =>
   client.post('/play/sessions', { startPointId, seedMoney })
 

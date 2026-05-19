@@ -2,6 +2,7 @@ package com.hindsight.play.controller;
 
 import com.hindsight.play.dto.NextRequest;
 import com.hindsight.play.dto.SessionStateResponse;
+import com.hindsight.play.dto.SessionSummaryResponse;
 import com.hindsight.play.dto.StartSessionRequest;
 import com.hindsight.play.service.PlayService;
 import com.hindsight.trade.dto.TradeRequest;
@@ -12,12 +13,21 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/play/sessions")
 @RequiredArgsConstructor
 public class PlayController {
 
     private final PlayService playService;
+
+    @GetMapping
+    public List<SessionSummaryResponse> listSessions(
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        return playService.listSessions(userDetails.getUsername());
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)

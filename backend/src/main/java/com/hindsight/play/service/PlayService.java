@@ -11,6 +11,7 @@ import com.hindsight.data.repository.StartPointRepository;
 import com.hindsight.global.exception.ResourceNotFoundException;
 import com.hindsight.play.dto.NextRequest;
 import com.hindsight.play.dto.SessionStateResponse;
+import com.hindsight.play.dto.SessionSummaryResponse;
 import com.hindsight.play.dto.StartSessionRequest;
 import com.hindsight.play.entity.PlaySession;
 import com.hindsight.play.entity.PortfolioSnapshot;
@@ -75,6 +76,32 @@ public class PlayService {
         portfolioSnapshotRepository.save(snapshot);
 
         return buildState(session);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SessionSummaryResponse> listSessions(String email) {
+        var user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다."));
+        return playSessionRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
+                .map(s -> {
+                    PortfolioSnapshot snap = portfolioSnapshotRepository
+                            .findTopBySessionIdOrderByDateDesc(s.getId()).orElse(null);
+                    BigDecimal returnRate = snap != null
+                            ? snap.getTotalValue().subtract(s.getSeedMoney())
+                                  .divide(s.getSeedMoney(), 4, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO;
+                    return new SessionSummaryResponse(
+                            s.getId(),
+                            s.getStartPoint().getName(),
+                            s.getStartPoint().getStartDate(),
+                            s.getSeedMoney(),
+                            s.getSimDate(),
+                            s.getStatus(),
+                            s.getCreatedAt(),
+                            returnRate
+                    );
+                })
+                .toList();
     }
 
     @Transactional(readOnly = true)

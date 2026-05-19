@@ -104,7 +104,17 @@ export default function PlayPage() {
 
       {/* 헤더 */}
       <div style={{ ...s.header, height: HEADER_H }}>
+        {/* 좌측: 홈 */}
+        <button style={s.iconBtn} onClick={() => navigate('/home')}>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M12.5 15L7.5 10L12.5 5" stroke="#374151" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+
+        {/* 중앙: 날짜 (절대 중앙) */}
         <span style={s.date}>{formatDate(simDate)}</span>
+
+        {/* 우측: 알림 + 종료 */}
         <div style={s.headerRight}>
           <div ref={bellRef} style={{ position: 'relative' }}>
             <button style={s.bellBtn} onClick={() => setBellOpen(v => !v)}>
@@ -178,11 +188,12 @@ const s = {
   root:       { height: '100vh', display: 'flex', flexDirection: 'column', background: '#f5f6f8', overflow: 'hidden' },
   center:     { color: '#9ca3af', textAlign: 'center', marginTop: 100 },
 
-  header:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', background: '#fff', borderBottom: '1px solid #e8eaed', flexShrink: 0 },
-  date:       { color: '#111827', fontSize: 15, fontWeight: 600, letterSpacing: '-0.2px' },
+  header:     { position: 'sticky', top: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px', background: '#fff', borderBottom: '1px solid #f0f0f0', flexShrink: 0 },
+  iconBtn:    { width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 10, flexShrink: 0 },
+  date:       { position: 'absolute', left: '50%', transform: 'translateX(-50%)', color: '#111827', fontSize: 14, fontWeight: 600, letterSpacing: '-0.2px', pointerEvents: 'none', whiteSpace: 'nowrap' },
   headerRight:{ display: 'flex', alignItems: 'center', gap: 8 },
 
-  bellBtn:    { position: 'relative', background: 'none', border: '1px solid #e8eaed', borderRadius: 8, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, flexShrink: 0 },
+  bellBtn:    { position: 'relative', background: 'none', border: 'none', borderRadius: 10, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, flexShrink: 0 },
   bellIcon:   { fontSize: 15, lineHeight: 1 },
   bellBadge:  { position: 'absolute', top: -5, right: -5, background: '#ef4444', color: '#fff', borderRadius: '50%', width: 17, height: 17, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' },
 
