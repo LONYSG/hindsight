@@ -10,7 +10,7 @@ export default function LoginPage() {
 
   const handleKakao = () => {
     const REST_KEY = import.meta.env.VITE_KAKAO_REST_API_KEY
-    const REDIRECT = encodeURIComponent('http://localhost:5173/auth/kakao/callback')
+    const REDIRECT = encodeURIComponent(`${window.location.origin}/auth/kakao/callback`)
     window.location.href = `https://kauth.kakao.com/oauth/authorize?client_id=${REST_KEY}&redirect_uri=${REDIRECT}&response_type=code`
   }
 
