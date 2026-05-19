@@ -84,3 +84,97 @@ def bulk_save(articles: list[dict]) -> int:
         with conn.cursor() as cur:
             cur.executemany(sql, rows)
     return len(rows)
+
+
+# ─── 배치 재처리용 ─────────────────────────────────────────────
+
+def get_pending_summary(batch_size: int = 50, offset: int = 0) -> list[dict]:
+    """brief가 없는 기사 조회 (re_summarize_all용)"""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, title, date, source, body
+                FROM news
+                WHERE body IS NOT NULL AND body != ''
+                  AND (brief IS NULL OR brief = '')
+                ORDER BY date ASC
+                LIMIT %s OFFSET %s
+                """,
+                (batch_size, offset),
+            )
+            rows = cur.fetchall()
+    return [
+        {"id": r[0], "title": r[1], "date": str(r[2]) if r[2] else "", "source": r[3], "body": r[4]}
+        for r in rows
+    ]
+
+
+def get_pending_summarize_initial(batch_size: int = 50) -> list[dict]:
+    """summary가 없는 기사 조회 (summarize_pending용)"""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, title, date, source, body
+                FROM news
+                WHERE body IS NOT NULL AND body != ''
+                  AND (summary IS NULL OR summary = '')
+                ORDER BY date ASC
+                LIMIT %s
+                """,
+                (batch_size,),
+            )
+            rows = cur.fetchall()
+    return [
+        {"id": r[0], "title": r[1], "date": str(r[2]) if r[2] else "", "source": r[3], "body": r[4]}
+        for r in rows
+    ]
+
+
+def update_llm_fields(news_id: int, title_ko: str, brief: str, summary: str, themes: list, llm_raw: str) -> None:
+    """Gemini 처리 결과(title_ko, brief, summary, themes, llm_raw) 업데이트"""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE news
+                SET title_ko = %s, brief = %s, summary = %s,
+                    themes = %s::text[], llm_raw = %s
+                WHERE id = %s
+                """,
+                (title_ko, brief, summary, themes, llm_raw, news_id),
+            )
+
+
+def get_distinct_dates() -> list[str]:
+    """뉴스가 존재하는 날짜 목록 (re_score_all용)"""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT date FROM news WHERE date IS NOT NULL ORDER BY date ASC")
+            return [str(row[0]) for row in cur.fetchall()]
+
+
+def get_articles_by_date(date_str: str) -> list[dict]:
+    """특정 날짜 기사 목록 (id, title, category)"""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, title, category FROM news WHERE date = %s",
+                (date_str,),
+            )
+            return [{"id": r[0], "title": r[1], "category": r[2]} for r in cur.fetchall()]
+
+
+def update_importance(news_id: int, importance: int) -> None:
+    """importance 점수 업데이트"""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE news SET importance = %s WHERE id = %s", (importance, news_id))
+
+
+def truncate_news() -> None:
+    """news 테이블 전체 삭제 (reset용)"""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE TABLE news RESTART IDENTITY")

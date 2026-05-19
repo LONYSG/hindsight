@@ -18,14 +18,14 @@ from datetime import date, timedelta
 
 import requests
 import google.generativeai as genai
-from elasticsearch import Elasticsearch, helpers
 
 from config import settings
-from db.pg_news import already_collected as pg_already_collected
-from db.pg_news import filter_existing as pg_filter_existing
-from db.pg_news import bulk_save as pg_bulk_save
-
-_ES_INDEX = "hindsight-news"
+from db.pg_news import (
+    already_collected, filter_existing, bulk_save,
+    get_pending_summary, get_pending_summarize_initial,
+    update_llm_fields, get_distinct_dates, get_articles_by_date,
+    update_importance, truncate_news,
+)
 _GUARDIAN_URL = "https://content.guardianapis.com/search"
 
 _BASE_SECTIONS = [
@@ -253,15 +253,11 @@ def collect(start_date: str, end_date: str, summarize: bool = False):
 
     rate limit 도달 시 즉시 중단 → 재실행하면 이어서 진행.
     """
-    es = _get_es_client()
-    _ensure_index(es)
-
     genai.configure(api_key=settings.GEMINI_API_KEY)
     model = genai.GenerativeModel(settings.GEMINI_MODEL)
 
     try:
-        _collect_base(es, start_date, end_date, model, summarize)
-
+        _collect_base(start_date, end_date, model, summarize)
     except RateLimitError:
         print()
         print("[news_collector] Guardian API 일일 한도(500회) 도달.")
@@ -275,30 +271,17 @@ def summarize_pending(batch_size: int = 50):
     summary 필드가 없는 기사를 Gemini로 요약.
     collect() 완료 후 별도 실행. 이 함수가 주요 과금 발생 지점.
     """
-    es = _get_es_client()
     genai.configure(api_key=settings.GEMINI_API_KEY)
     model = genai.GenerativeModel(settings.GEMINI_MODEL)
 
     total = 0
     while True:
-        resp = es.search(
-            index=_ES_INDEX,
-            query={"bool": {"must_not": {"exists": {"field": "summary"}}}},
-            _source=["title", "date", "source", "body"],
-            size=batch_size,
-        )
-        hits = resp["hits"]["hits"]
-        if not hits:
+        articles = get_pending_summarize_initial(batch_size)
+        if not articles:
             break
-        for hit in hits:
-            r = _summarize(model, hit["_source"])
-            es.update(index=_ES_INDEX, id=hit["_id"], body={"doc": {
-                "title_ko": r["title_ko"],
-                "brief":    r["brief"],
-                "summary":  r["summary"],
-                "themes":   r["themes"],
-                "llm_raw":  r["llm_raw"],
-            }})
+        for a in articles:
+            r = _summarize(model, a)
+            update_llm_fields(a["id"], r["title_ko"], r["brief"], r["summary"], r["themes"], r["llm_raw"])
             total += 1
             time.sleep(_GEMINI_FREE_TIER_SLEEP)
         print(f"[summarize_pending] {total}건 완료...")
@@ -306,58 +289,34 @@ def summarize_pending(batch_size: int = 50):
     print(f"[summarize_pending] 완료. 총 {total}건")
 
 
-def reset_index():
+def reset_news():
     """
-    ES 인덱스 초기화 (재수집 전 실행).
-    기존 데이터 전체 삭제 후 새 매핑으로 재생성.
+    news 테이블 전체 초기화 (재수집 전 실행).
     """
-    es = _get_es_client()
-    if es.indices.exists(index=_ES_INDEX):
-        es.indices.delete(index=_ES_INDEX)
-        print(f"[reset_index] '{_ES_INDEX}' 인덱스 삭제 완료")
-    _ensure_index(es)
-    print(f"[reset_index] '{_ES_INDEX}' 인덱스 재생성 완료 (importance 필드 포함)")
+    truncate_news()
+    print("[reset_news] news 테이블 초기화 완료")
 
 
 def re_summarize_all(batch_size: int = 50):
     """
     프롬프트 개선 후 전체 재요약.
     brief 필드가 없는 기사만 처리 → 중단 후 재실행해도 이어서 진행 가능.
-    하루 500회 무료 쿼터 → 약 500건/일 처리 가능.
     """
-    es = _get_es_client()
     genai.configure(api_key=settings.GEMINI_API_KEY)
     model = genai.GenerativeModel(settings.GEMINI_MODEL)
 
     total = 0
-    page = 0
+    offset = 0
     while True:
-        resp = es.search(
-            index=_ES_INDEX,
-            query={"bool": {"must_not": {"exists": {"field": "brief"}}}},
-            _source=["title", "date", "source", "body"],
-            size=batch_size,
-            from_=page * batch_size,
-            sort=[{"date": "asc"}],
-        )
-        hits = resp["hits"]["hits"]
-        if not hits:
+        articles = get_pending_summary(batch_size, offset)
+        if not articles:
             break
-        for hit in hits:
-            src = hit["_source"]
-            if not src.get("body"):
-                continue
-            r = _summarize(model, src)
-            es.update(index=_ES_INDEX, id=hit["_id"], body={"doc": {
-                "title_ko": r["title_ko"],
-                "brief":    r["brief"],
-                "summary":  r["summary"],
-                "themes":   r["themes"],
-                "llm_raw":  r["llm_raw"],
-            }})
+        for a in articles:
+            r = _summarize(model, a)
+            update_llm_fields(a["id"], r["title_ko"], r["brief"], r["summary"], r["themes"], r["llm_raw"])
             total += 1
             time.sleep(_GEMINI_FREE_TIER_SLEEP)
-        page += 1
+        offset += batch_size
         print(f"[re_summarize_all] {total}건 완료...")
 
     print(f"[re_summarize_all] 전체 완료. 총 {total}건")
@@ -368,32 +327,18 @@ def re_score_all():
     """
     기존 수집된 기사의 투자 참고 가치 점수(importance) 재평가.
     변경된 _SELECTION_PROMPT 기준으로 날짜별 재점수화.
-    하루치 = Gemini 1회 호출 → 29일 기준 ~30초 소요, 비용 미미.
     """
-    es = _get_es_client()
     genai.configure(api_key=settings.GEMINI_API_KEY)
     model = genai.GenerativeModel(settings.GEMINI_MODEL)
 
-    resp = es.search(
-        index=_ES_INDEX,
-        aggs={"dates": {"terms": {"field": "date", "size": 1000}}},
-        size=0,
-    )
-    dates = sorted([b["key"] for b in resp["aggregations"]["dates"]["buckets"]])
-
+    dates = get_distinct_dates()
     total = 0
+
     for day_str in dates:
-        day_resp = es.search(
-            index=_ES_INDEX,
-            query={"term": {"date": day_str}},
-            _source=["title", "category"],
-            size=200,
-        )
-        hits = day_resp["hits"]["hits"]
-        if not hits:
+        articles = get_articles_by_date(day_str)
+        if not articles:
             continue
 
-        articles = [{"title": h["_source"]["title"], "category": h["_source"]["category"], "_id": h["_id"]} for h in hits]
         headlines = "\n".join(f"{i+1}. [{a['category']}] {a['title']}" for i, a in enumerate(articles))
         prompt = _SELECTION_PROMPT.format(date=day_str, headlines=headlines)
 
@@ -412,11 +357,10 @@ def re_score_all():
                 idx = int(parts[0].strip()) - 1
                 score = int(parts[1].strip())
                 if 0 <= idx < len(articles):
-                    score_map[articles[idx]["_id"]] = score
+                    score_map[articles[idx]["id"]] = score
 
             for art in articles:
-                new_score = score_map.get(art["_id"], 1)
-                es.update(index=_ES_INDEX, id=art["_id"], body={"doc": {"importance": new_score}})
+                update_importance(art["id"], score_map.get(art["id"], 1))
                 total += 1
 
             time.sleep(_GEMINI_FREE_TIER_SLEEP)
@@ -431,7 +375,7 @@ def re_score_all():
 
 # ─── 베이스 레이어 ────────────────────────────────────────────
 
-def _collect_base(es: Elasticsearch, start_date: str, end_date: str, model, summarize: bool):
+def _collect_base(start_date: str, end_date: str, model, summarize: bool):
     start = date.fromisoformat(start_date)
     end = date.fromisoformat(end_date)
     current = start
@@ -442,7 +386,7 @@ def _collect_base(es: Elasticsearch, start_date: str, end_date: str, model, summ
         day_str = current.strftime("%Y-%m-%d")
 
         # 이미 처리된 날 스킵 (BUSINESS 기준으로 판단)
-        if pg_already_collected(day_str, "BUSINESS"):
+        if already_collected(day_str, "BUSINESS"):
             current += timedelta(days=1)
             continue
 
@@ -459,7 +403,7 @@ def _collect_base(es: Elasticsearch, start_date: str, end_date: str, model, summ
 
         # Gemini 헤드라인 선별
         selected = _select_with_gemini(model, all_articles, day_str)
-        new_articles = pg_filter_existing(selected)
+        new_articles = filter_existing(selected)
 
         if summarize:
             for a in new_articles:
@@ -471,7 +415,7 @@ def _collect_base(es: Elasticsearch, start_date: str, end_date: str, model, summ
                 a["llm_raw"]  = r["llm_raw"]
                 time.sleep(_GEMINI_FREE_TIER_SLEEP)
 
-        saved = pg_bulk_save(new_articles)
+        saved = bulk_save(new_articles)
         total_saved += saved
 
         elapsed = (current - start).days + 1
@@ -614,84 +558,6 @@ def _parse_guardian(r: dict, category: str) -> dict:
     }
 
 
-# ─── Elasticsearch ────────────────────────────────────────────
-
-def _get_es_client() -> Elasticsearch:
-    return Elasticsearch(f"http://{settings.ELASTICSEARCH_HOST}:{settings.ELASTICSEARCH_PORT}")
-
-
-def _ensure_index(es: Elasticsearch):
-    if es.indices.exists(index=_ES_INDEX):
-        return
-    es.indices.create(
-        index=_ES_INDEX,
-        body={
-            "mappings": {
-                "properties": {
-                    "date":         {"type": "keyword"},
-                    "published_at": {"type": "date"},
-                    "category":     {"type": "keyword"},
-                    "source":       {"type": "keyword"},
-                    "title":        {"type": "text", "analyzer": "english"},
-                    "title_ko":     {"type": "text"},
-                    "url":          {"type": "keyword"},
-                    "body":         {"type": "text", "analyzer": "english"},
-                    "brief":        {"type": "text"},
-                    "summary":      {"type": "text"},
-                    "importance":   {"type": "integer"},
-                    "themes":       {"type": "keyword"},
-                    "llm_raw":      {"type": "text", "index": False},
-                }
-            }
-        },
-    )
-    print(f"[news_collector] ES 인덱스 '{_ES_INDEX}' 생성됨")
-
-
-def _already_collected(es: Elasticsearch, day: str, category: str) -> bool:
-    try:
-        resp = es.count(
-            index=_ES_INDEX,
-            query={"bool": {"must": [
-                {"term": {"date": day}},
-                {"term": {"category": category}},
-            ]}}
-        )
-        return resp["count"] > 0
-    except Exception:
-        return False
-
-
-def _filter_existing(es: Elasticsearch, articles: list[dict]) -> list[dict]:
-    if not articles:
-        return []
-    urls = list({a["url"] for a in articles})
-    try:
-        resp = es.search(
-            index=_ES_INDEX,
-            query={"terms": {"url": urls}},
-            _source=["url"],
-            size=len(urls),
-        )
-        existing = {h["_source"]["url"] for h in resp["hits"]["hits"]}
-    except Exception:
-        existing = set()
-
-    seen: set[str] = set()
-    result = []
-    for a in articles:
-        if a["url"] not in existing and a["url"] not in seen:
-            seen.add(a["url"])
-            result.append(a)
-    return result
-
-
-def _bulk_save(es: Elasticsearch, articles: list[dict]) -> int:
-    if not articles:
-        return 0
-    actions = [{"_index": _ES_INDEX, "_source": a} for a in articles]
-    success, _ = helpers.bulk(es, actions, raise_on_error=False)
-    return success
 
 
 # ─── 유틸 ────────────────────────────────────────────────────
