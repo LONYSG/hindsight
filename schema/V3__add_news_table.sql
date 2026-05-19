@@ -19,3 +19,4 @@ CREATE TABLE news (
 
 CREATE INDEX idx_news_published_at ON news(published_at);
 CREATE INDEX idx_news_importance   ON news(importance);
+CREATE UNIQUE INDEX idx_news_url ON news(url) WHERE url IS NOT NULL AND url != '';

@@ -21,11 +21,10 @@ from datetime import datetime, timezone
 
 import requests
 import google.generativeai as genai
-from elasticsearch import Elasticsearch, helpers
 
 from config import settings
+from db.pg_news import filter_existing, bulk_save
 
-_ES_INDEX    = "hindsight-news"
 _AV_URL      = "https://www.alphavantage.co/query"
 _M7_TICKERS  = ["NVDA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA"]
 _GEMINI_SLEEP = 4.5
@@ -96,7 +95,7 @@ OTHER
 
 def collect(tickers: list[str] | None = None, start_date: str = "2020-02-01", end_date: str = "2020-02-29") -> None:
     """
-    Alpha Vantage에서 기업별 뉴스를 수집해 ES에 저장한다.
+    Alpha Vantage에서 기업별 뉴스를 수집해 PostgreSQL에 저장한다.
     선별 단계 없이 ticker 기반 필터링된 기사를 바로 요약.
     """
     if not settings.ALPHA_VANTAGE_API_KEY:
@@ -104,22 +103,20 @@ def collect(tickers: list[str] | None = None, start_date: str = "2020-02-01", en
         return
 
     target = tickers or _M7_TICKERS
-    es = _get_es_client()
-    _ensure_fields(es)
 
     genai.configure(api_key=settings.GEMINI_API_KEY)
     model = genai.GenerativeModel(settings.GEMINI_MODEL)
 
     total_saved = 0
     for ticker in target:
-        saved = _collect_ticker(es, model, ticker, start_date, end_date)
+        saved = _collect_ticker(model, ticker, start_date, end_date)
         total_saved += saved
         print(f"[{ticker}] {saved}건 저장\n")
 
     print(f"[company_news] 전체 완료. 총 {total_saved}건")
 
 
-def _collect_ticker(es: Elasticsearch, model, ticker: str, start_date: str, end_date: str) -> int:
+def _collect_ticker(model, ticker: str, start_date: str, end_date: str) -> int:
     print(f"[{ticker}] 수집 시작: {start_date} ~ {end_date}")
 
     articles = _fetch_alpha_vantage(ticker, start_date, end_date)
@@ -128,8 +125,11 @@ def _collect_ticker(es: Elasticsearch, model, ticker: str, start_date: str, end_
         return 0
 
     print(f"[{ticker}] {len(articles)}건 수집됨, 중복 제거 중...")
-    articles = _filter_existing(es, articles)
+    articles = filter_existing(articles)
     print(f"[{ticker}] {len(articles)}건 신규, 요약 시작...")
+
+    if not articles:
+        return 0
 
     for a in articles:
         r = _summarize(model, a)
@@ -140,11 +140,7 @@ def _collect_ticker(es: Elasticsearch, model, ticker: str, start_date: str, end_
         a["llm_raw"]  = r["llm_raw"]
         time.sleep(_GEMINI_SLEEP)
 
-    if not articles:
-        return 0
-
-    ok, _ = helpers.bulk(es, [{"_index": _ES_INDEX, "_source": a} for a in articles], raise_on_error=False)
-    return ok
+    return bulk_save(articles)
 
 
 def _fetch_alpha_vantage(ticker: str, start_date: str, end_date: str) -> list[dict]:
@@ -242,47 +238,3 @@ def _summarize(model, article: dict) -> dict:
         return _empty
 
 
-def _filter_existing(es: Elasticsearch, articles: list[dict]) -> list[dict]:
-    if not articles:
-        return []
-    urls = list({a["url"] for a in articles if a.get("url")})
-    if not urls:
-        return articles
-    try:
-        resp = es.search(
-            index=_ES_INDEX,
-            query={"terms": {"url": urls}},
-            _source=["url"],
-            size=len(urls),
-        )
-        existing = {h["_source"]["url"] for h in resp["hits"]["hits"]}
-    except Exception:
-        existing = set()
-
-    seen: set[str] = set()
-    result = []
-    for a in articles:
-        url = a.get("url", "")
-        if url and url not in existing and url not in seen:
-            seen.add(url)
-            result.append(a)
-    return result
-
-
-def _get_es_client() -> Elasticsearch:
-    return Elasticsearch(f"http://{settings.ELASTICSEARCH_HOST}:{settings.ELASTICSEARCH_PORT}")
-
-
-def _ensure_fields(es: Elasticsearch) -> None:
-    try:
-        es.indices.put_mapping(
-            index=_ES_INDEX,
-            body={
-                "properties": {
-                    "source_type": {"type": "keyword"},
-                    "tickers":     {"type": "keyword"},
-                }
-            },
-        )
-    except Exception:
-        pass

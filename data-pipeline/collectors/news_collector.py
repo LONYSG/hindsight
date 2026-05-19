@@ -21,6 +21,9 @@ import google.generativeai as genai
 from elasticsearch import Elasticsearch, helpers
 
 from config import settings
+from db.pg_news import already_collected as pg_already_collected
+from db.pg_news import filter_existing as pg_filter_existing
+from db.pg_news import bulk_save as pg_bulk_save
 
 _ES_INDEX = "hindsight-news"
 _GUARDIAN_URL = "https://content.guardianapis.com/search"
@@ -439,7 +442,7 @@ def _collect_base(es: Elasticsearch, start_date: str, end_date: str, model, summ
         day_str = current.strftime("%Y-%m-%d")
 
         # 이미 처리된 날 스킵 (BUSINESS 기준으로 판단)
-        if _already_collected(es, day_str, "BUSINESS"):
+        if pg_already_collected(day_str, "BUSINESS"):
             current += timedelta(days=1)
             continue
 
@@ -456,7 +459,7 @@ def _collect_base(es: Elasticsearch, start_date: str, end_date: str, model, summ
 
         # Gemini 헤드라인 선별
         selected = _select_with_gemini(model, all_articles, day_str)
-        new_articles = _filter_existing(es, selected)
+        new_articles = pg_filter_existing(selected)
 
         if summarize:
             for a in new_articles:
@@ -468,7 +471,7 @@ def _collect_base(es: Elasticsearch, start_date: str, end_date: str, model, summ
                 a["llm_raw"]  = r["llm_raw"]
                 time.sleep(_GEMINI_FREE_TIER_SLEEP)
 
-        saved = _bulk_save(es, new_articles)
+        saved = pg_bulk_save(new_articles)
         total_saved += saved
 
         elapsed = (current - start).days + 1
