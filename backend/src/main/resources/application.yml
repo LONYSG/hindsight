@@ -24,7 +24,7 @@ server:
 
 jwt:
   secret: hindsight-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256
-  expiration-ms: 86400000         # 24시간
+  expiration-ms: 2592000000        # 30일
 
 kakao:
   rest-api-key: ${KAKAO_REST_API_KEY}

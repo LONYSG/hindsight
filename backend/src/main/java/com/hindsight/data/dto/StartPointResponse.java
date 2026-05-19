@@ -8,9 +8,10 @@ public record StartPointResponse(
         Long id,
         String name,
         String description,
-        LocalDate startDate
+        LocalDate startDate,
+        boolean available
 ) {
     public static StartPointResponse from(StartPoint sp) {
-        return new StartPointResponse(sp.getId(), sp.getName(), sp.getDescription(), sp.getStartDate());
+        return new StartPointResponse(sp.getId(), sp.getName(), sp.getDescription(), sp.getStartDate(), sp.isAvailable());
     }
 }

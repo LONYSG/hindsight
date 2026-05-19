@@ -23,4 +23,7 @@ public class StartPoint {
 
     @Column(nullable = false)
     private LocalDate startDate;
+
+    @Column(nullable = false)
+    private boolean available;
 }

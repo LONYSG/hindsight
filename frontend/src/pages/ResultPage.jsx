@@ -176,6 +176,33 @@ export default function ResultPage() {
         <InfoRow label="플레이 기간"   value={`${days}일`} last />
       </div>
 
+      {/* 전문가 비교 */}
+      {getExperts(result.startDate).length > 0 && (
+        <div style={s.card}>
+          <div style={s.sectionLabel}>같은 시기 전문 투자자들은?</div>
+          <p style={s.expertNote}>참고: 2020년 연간 기준 공개 데이터</p>
+          {getExperts(result.startDate).map(e => (
+            <div key={e.name} style={s.expertCard}>
+              <div style={s.expertTop}>
+                <div style={s.expertLeft}>
+                  <span style={s.expertEmoji}>{e.emoji}</span>
+                  <div>
+                    <div style={s.expertName}>{e.name}</div>
+                    <div style={s.expertFund}>{e.fund}</div>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ ...s.expertReturn, color: rateColor(e.returnValue) }}>{e.returnLabel}</div>
+                  <div style={s.expertPeriod}>{e.period}</div>
+                </div>
+              </div>
+              <div style={s.expertStyle}>{e.style}</div>
+              <p style={s.expertSummary}>{e.summary}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       <button style={s.replayBtn} onClick={() => navigate('/setup')}>
         다시 하기
       </button>
@@ -204,6 +231,48 @@ function buildCompareItems(result) {
   })
 
   return items
+}
+
+const EXPERT_DATA = {
+  '2020': [
+    {
+      name: '워런 버핏',
+      fund: 'Berkshire Hathaway',
+      emoji: '🏦',
+      returnLabel: '+2.4%',
+      returnValue: 0.024,
+      period: '2020년 연간',
+      style: '가치 투자 · 장기 보유',
+      summary: '코로나 급락에서 "아직 매수할 게 없다"며 현금을 비축. 항공주를 전량 손절하고 실수를 공개 인정. 시장 대비 크게 언더퍼폼했지만 장기 원칙은 고수했다.',
+    },
+    {
+      name: '캐시 우드',
+      fund: 'ARK Innovation (ARKK)',
+      emoji: '🚀',
+      returnLabel: '+156%',
+      returnValue: 1.56,
+      period: '2020년 연간',
+      style: '혁신 성장 투자 · 고위험',
+      summary: '급락 구간에서 테슬라·줌·텔라닥을 공격적으로 매수. "5년 후를 보라"며 단기 변동성을 무시했다. 2020년 최고 성과 펀드 중 하나로 이름을 알렸다.',
+    },
+    {
+      name: '레이 달리오',
+      fund: 'Bridgewater All Weather',
+      emoji: '🌐',
+      returnLabel: '-12%',
+      returnValue: -0.12,
+      period: '2020년 연간',
+      style: '거시 분산 투자',
+      summary: '"현금은 쓰레기"를 외치며 분산 원칙을 고수했지만, All Weather 전략도 코로나 급락은 피하지 못했다. 위기 초반 낙관론을 고수해 비판을 받았다.',
+    },
+  ],
+}
+
+function getExperts(startDate) {
+  if (!startDate) return []
+  // 2020년 코로나 시나리오
+  if (startDate >= '2020-01-01' && startDate <= '2020-12-31') return EXPERT_DATA['2020'] ?? []
+  return []
 }
 
 function getTendencies(result, days) {
@@ -308,4 +377,16 @@ const s = {
   themeCount:   { color: '#9ca3af', fontSize: 11, width: 28, textAlign: 'right', flexShrink: 0 },
 
   replayBtn:    { background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, padding: '14px', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginTop: 4 },
+
+  expertNote:   { color: '#9ca3af', fontSize: 11, marginBottom: 12, marginTop: -4 },
+  expertCard:   { paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid #f3f4f6' },
+  expertTop:    { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
+  expertLeft:   { display: 'flex', alignItems: 'center', gap: 10 },
+  expertEmoji:  { fontSize: 26, lineHeight: 1 },
+  expertName:   { color: '#111827', fontSize: 14, fontWeight: 700 },
+  expertFund:   { color: '#9ca3af', fontSize: 11, marginTop: 2 },
+  expertReturn: { fontSize: 16, fontWeight: 700 },
+  expertPeriod: { color: '#9ca3af', fontSize: 11, marginTop: 2 },
+  expertStyle:  { display: 'inline-block', background: '#f3f4f6', color: '#6b7280', fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 20, marginBottom: 8 },
+  expertSummary:{ color: '#374151', fontSize: 12, lineHeight: 1.7, margin: 0 },
 }
