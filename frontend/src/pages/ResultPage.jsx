@@ -9,6 +9,30 @@ const upColor   = '#f43f5e'
 const downColor = '#3b82f6'
 const rateColor = (v) => Number(v) >= 0 ? upColor : downColor
 
+function shareKakao(result, tendencies, sessionId) {
+  if (!window.Kakao?.isInitialized()) return
+  const myReturnPct = pct(result.myReturn)
+  const alphaPct    = pct(result.alpha)
+  const beatMarket  = Number(result.alpha) > 0
+  const badge       = tendencies[0]?.label ?? '투자자'
+  const title       = beatMarket ? `🏆 시장을 이겼습니다! ${myReturnPct}` : `📉 시장에 졌습니다 ${myReturnPct}`
+  const desc        = `알파 ${alphaPct} · 투자 성향: ${badge}\nHindsight에서 당신의 투자 성향을 확인해보세요`
+  const resultUrl   = `http://localhost:5173/result/${sessionId}`
+
+  window.Kakao.Share.sendDefault({
+    objectType: 'feed',
+    content: {
+      title,
+      description: desc,
+      imageUrl: 'https://developers.kakao.com/assets/img/about/logos/kakaolink/kakaolink_btn_medium.png',
+      link: { mobileWebUrl: resultUrl, webUrl: resultUrl },
+    },
+    buttons: [
+      { title: '결과 보기', link: { mobileWebUrl: resultUrl, webUrl: resultUrl } },
+    ],
+  })
+}
+
 export default function ResultPage() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
@@ -35,6 +59,7 @@ export default function ResultPage() {
   )
   if (error || !result) return <div style={s.center}>결과를 불러올 수 없습니다</div>
 
+  const isOwner     = !!localStorage.getItem('token')
   const beatMarket  = Number(result.alpha) > 0
   const myReturnNum = Number(result.myReturn)
   const days        = Math.round((new Date(result.endDate) - new Date(result.startDate)) / 86400000)
@@ -47,12 +72,16 @@ export default function ResultPage() {
   return (
     <div style={s.root}>
 
-      <AppHeader title="투자 결과 리포트" />
+      {isOwner
+        ? <AppHeader title="투자 결과 리포트" />
+        : <div style={s.viewerHeader}><span style={s.viewerTitle}>투자 결과 리포트</span></div>
+      }
 
       <div style={{ padding: '16px 16px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
       {/* 서브 헤더 */}
       <div style={s.header}>
+        <div style={s.playerName}>{result.playerName} 님의 투자 기록</div>
         <div style={s.headerSub}>{result.startDate} → {result.endDate} ({days}일)</div>
       </div>
 
@@ -180,7 +209,7 @@ export default function ResultPage() {
       {getExperts(result.startDate).length > 0 && (
         <div style={s.card}>
           <div style={s.sectionLabel}>같은 시기 전문 투자자들은?</div>
-          <p style={s.expertNote}>참고: 2020년 연간 기준 공개 데이터</p>
+          <p style={s.expertNote}>{getExpertNote(result.startDate)}</p>
           {getExperts(result.startDate).map(e => (
             <div key={e.name} style={s.expertCard}>
               <div style={s.expertTop}>
@@ -203,9 +232,22 @@ export default function ResultPage() {
         </div>
       )}
 
-      <button style={s.replayBtn} onClick={() => navigate('/setup')}>
-        다시 하기
-      </button>
+      {isOwner ? (
+        <>
+          <button style={s.shareBtn} onClick={() => shareKakao(result, tendencies, sessionId)}>
+            <img src="https://developers.kakao.com/assets/img/about/logos/kakaolink/kakaolink_btn_small.png"
+              alt="" style={{ width: 18, marginRight: 8 }} />
+            카카오톡으로 결과 공유하기
+          </button>
+          <button style={s.replayBtn} onClick={() => navigate('/setup')}>
+            다시 하기
+          </button>
+        </>
+      ) : (
+        <button style={s.replayBtn} onClick={() => navigate('/login')}>
+          나도 해보기 →
+        </button>
+      )}
 
       </div>
     </div>
@@ -234,45 +276,127 @@ function buildCompareItems(result) {
 }
 
 const EXPERT_DATA = {
-  '2020': [
-    {
-      name: '워런 버핏',
-      fund: 'Berkshire Hathaway',
-      emoji: '🏦',
-      returnLabel: '+2.4%',
-      returnValue: 0.024,
-      period: '2020년 연간',
-      style: '가치 투자 · 장기 보유',
-      summary: '코로나 급락에서 "아직 매수할 게 없다"며 현금을 비축. 항공주를 전량 손절하고 실수를 공개 인정. 시장 대비 크게 언더퍼폼했지만 장기 원칙은 고수했다.',
-    },
-    {
-      name: '캐시 우드',
-      fund: 'ARK Innovation (ARKK)',
-      emoji: '🚀',
-      returnLabel: '+156%',
-      returnValue: 1.56,
-      period: '2020년 연간',
-      style: '혁신 성장 투자 · 고위험',
-      summary: '급락 구간에서 테슬라·줌·텔라닥을 공격적으로 매수. "5년 후를 보라"며 단기 변동성을 무시했다. 2020년 최고 성과 펀드 중 하나로 이름을 알렸다.',
-    },
-    {
-      name: '레이 달리오',
-      fund: 'Bridgewater All Weather',
-      emoji: '🌐',
-      returnLabel: '-12%',
-      returnValue: -0.12,
-      period: '2020년 연간',
-      style: '거시 분산 투자',
-      summary: '"현금은 쓰레기"를 외치며 분산 원칙을 고수했지만, All Weather 전략도 코로나 급락은 피하지 못했다. 위기 초반 낙관론을 고수해 비판을 받았다.',
-    },
-  ],
+  '2020': {
+    note: '참고: 2020년 연간 기준 공개 데이터',
+    experts: [
+      {
+        name: '워런 버핏',
+        fund: 'Berkshire Hathaway',
+        emoji: '🏦',
+        returnLabel: '+2.4%',
+        returnValue: 0.024,
+        period: '2020년 연간',
+        style: '가치 투자 · 장기 보유',
+        summary: '코로나 급락에서 "아직 매수할 게 없다"며 현금을 비축. 항공주를 전량 손절하고 실수를 공개 인정. 시장 대비 크게 언더퍼폼했지만 장기 원칙은 고수했다.',
+      },
+      {
+        name: '캐시 우드',
+        fund: 'ARK Innovation (ARKK)',
+        emoji: '🚀',
+        returnLabel: '+156%',
+        returnValue: 1.56,
+        period: '2020년 연간',
+        style: '혁신 성장 투자 · 고위험',
+        summary: '급락 구간에서 테슬라·줌·텔라닥을 공격적으로 매수. "5년 후를 보라"며 단기 변동성을 무시했다. 2020년 최고 성과 펀드 중 하나로 이름을 알렸다.',
+      },
+      {
+        name: '레이 달리오',
+        fund: 'Bridgewater All Weather',
+        emoji: '🌐',
+        returnLabel: '-12%',
+        returnValue: -0.12,
+        period: '2020년 연간',
+        style: '거시 분산 투자',
+        summary: '"현금은 쓰레기"를 외치며 분산 원칙을 고수했지만, All Weather 전략도 코로나 급락은 피하지 못했다. 위기 초반 낙관론을 고수해 비판을 받았다.',
+      },
+    ],
+  },
+  '2021': {
+    note: '참고: 2022년 연간 기준 공개 데이터 (연준 금리인상 사이클)',
+    experts: [
+      {
+        name: '워런 버핏',
+        fund: 'Berkshire Hathaway',
+        emoji: '🏦',
+        returnLabel: '+4.0%',
+        returnValue: 0.04,
+        period: '2022년 연간',
+        style: '가치 투자 · 에너지 집중',
+        summary: 'S&P500이 -18% 폭락하는 동안 +4% 방어. 쉐브론·옥시덴탈에 수백억 달러를 집중 매수. "금리가 오르면 가치주가 빛난다"는 원칙이 정확히 맞아떨어졌다.',
+      },
+      {
+        name: '레이 달리오',
+        fund: 'Bridgewater Pure Alpha',
+        emoji: '🌐',
+        returnLabel: '+32%',
+        returnValue: 0.32,
+        period: '2022년 연간',
+        style: '거시 헤지 · 채권 공매도',
+        summary: '2020년 All Weather로 손실을 봤지만 Pure Alpha 펀드로 설욕. 인플레이션 초기부터 채권 공매도·원자재 롱 포지션을 구축해 금리 인상 사이클을 정확히 공략했다.',
+      },
+      {
+        name: '캐시 우드',
+        fund: 'ARK Innovation (ARKK)',
+        emoji: '🚀',
+        returnLabel: '-67%',
+        returnValue: -0.67,
+        period: '2022년 연간',
+        style: '혁신 성장 투자',
+        summary: '2020년 +156%의 영웅이 2022년 최대 피해자로. 금리 상승이 고성장·고밸류 기술주에 직격탄을 날렸다. 테슬라·줌·코인베이스를 끝까지 보유하며 "장기 혁신의 가치"를 주장했다.',
+      },
+    ],
+  },
+  '2023': {
+    note: '참고: 2023년 연간 기준 공개 데이터 (AI 혁명 원년)',
+    experts: [
+      {
+        name: '캐시 우드',
+        fund: 'ARK Innovation (ARKK)',
+        emoji: '🚀',
+        returnLabel: '+68%',
+        returnValue: 0.68,
+        period: '2023년 연간',
+        style: '혁신 성장 투자',
+        summary: '2022년 -67% 참패 이후 극적인 반등. AI·혁신 기술주 중심 포트폴리오가 부활했다. 2022년 내내 "혁신의 가치는 변하지 않는다"며 버텼던 것이 결실을 맺었다.',
+      },
+      {
+        name: '워런 버핏',
+        fund: 'Berkshire Hathaway',
+        emoji: '🏦',
+        returnLabel: '+15.8%',
+        returnValue: 0.158,
+        period: '2023년 연간',
+        style: '가치 투자 · AI 무관심',
+        summary: 'S&P500(+26%)보다 낮은 수익률. AI 관련 기업을 직접 편입하지 않았지만, 포트폴리오의 50%를 차지한 애플이 AI 수혜주로 부상하며 수익을 견인했다.',
+      },
+      {
+        name: '마이클 버리',
+        fund: 'Scion Asset Management',
+        emoji: '🐻',
+        returnLabel: '손실 (추정)',
+        returnValue: -0.15,
+        period: '2023년',
+        style: '역발상 공매도',
+        summary: '2008년 금융위기를 예측한 "빅쇼트"가 AI 랠리에서 틀렸다. 2023년 중반 S&P500·나스닥 풋옵션을 대규모로 매수했지만 시장은 계속 올랐다. 전설도 AI의 파괴력을 과소평가했다.',
+      },
+    ],
+  },
 }
 
 function getExperts(startDate) {
   if (!startDate) return []
-  // 2020년 코로나 시나리오
-  if (startDate >= '2020-01-01' && startDate <= '2020-12-31') return EXPERT_DATA['2020'] ?? []
+  if (startDate >= '2020-01-01' && startDate <= '2020-12-31') return EXPERT_DATA['2020'].experts
+  if (startDate >= '2021-01-01' && startDate <= '2022-12-31') return EXPERT_DATA['2021'].experts
+  if (startDate >= '2023-01-01' && startDate <= '2024-12-31') return EXPERT_DATA['2023'].experts
   return []
+}
+
+function getExpertNote(startDate) {
+  if (!startDate) return ''
+  if (startDate >= '2020-01-01' && startDate <= '2020-12-31') return EXPERT_DATA['2020'].note
+  if (startDate >= '2021-01-01' && startDate <= '2022-12-31') return EXPERT_DATA['2021'].note
+  if (startDate >= '2023-01-01' && startDate <= '2024-12-31') return EXPERT_DATA['2023'].note
+  return ''
 }
 
 function getTendencies(result, days) {
@@ -337,8 +461,8 @@ const s = {
   spinner:      { width: 36, height: 36, border: '3px solid #e5e7eb', borderTop: '3px solid #16a34a', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
   loadingText:  { color: '#6b7280', fontSize: 14, fontWeight: 500 },
   header:       { marginBottom: 4 },
-  headerTitle:  { color: '#111827', fontSize: 20, fontWeight: 700, letterSpacing: '-0.3px' },
-  headerSub:    { color: '#6b7280', fontSize: 12, marginTop: 4 },
+  playerName:   { color: '#111827', fontSize: 18, fontWeight: 700, letterSpacing: '-0.3px', marginBottom: 4 },
+  headerSub:    { color: '#9ca3af', fontSize: 12 },
 
   assetCard:    { background: '#fff', borderRadius: 12, padding: '16px', border: '1px solid #e8eaed' },
   assetRow:     { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' },
@@ -376,7 +500,10 @@ const s = {
   themeFill:    { height: '100%', background: '#6366f1', borderRadius: 3 },
   themeCount:   { color: '#9ca3af', fontSize: 11, width: 28, textAlign: 'right', flexShrink: 0 },
 
-  replayBtn:    { background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, padding: '14px', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginTop: 4 },
+  viewerHeader: { position: 'sticky', top: 0, zIndex: 100, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', borderBottom: '1px solid #f0f0f0', flexShrink: 0 },
+  viewerTitle:  { color: '#111827', fontSize: 15, fontWeight: 600, letterSpacing: '-0.3px' },
+  shareBtn:     { width: '100%', background: '#FEE500', color: '#000000CC', border: 'none', borderRadius: 10, padding: '14px', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  replayBtn:    { width: '100%', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, padding: '14px', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginTop: 8 },
 
   expertNote:   { color: '#9ca3af', fontSize: 11, marginBottom: 12, marginTop: -4 },
   expertCard:   { paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid #f3f4f6' },
