@@ -1,6 +1,6 @@
 spring:
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:elasticsearch}
+    active: ${SPRING_PROFILES_ACTIVE:postgres}
 
   datasource:
     url: jdbc:postgresql://localhost:5433/hindsight
