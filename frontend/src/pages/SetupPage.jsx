@@ -7,7 +7,7 @@ import AppHeader from '../components/AppHeader'
 const LOGO = (domain) => `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
 
 const SCENARIO_META = {
-  '2020-02-20': {
+  '2020-02-03': {
     period: '2020.02 – 2021.10',
     tags: ['공급망', '글로벌 경기', '중앙은행'],
     accent: '#16a34a', bg: '#f0fdf4',
@@ -26,7 +26,7 @@ const SCENARIO_META = {
 
 // CAGR 기준 기간: 시나리오 시작일 기준 직전 3년
 const SCENARIO_CONTEXT = {
-  '2020-02-20': {
+  '2020-02-03': {
     cagrPeriod: '2017–2020',
     companies: [
       { ticker: 'NVDA', name: 'NVIDIA',    logo: LOGO('nvidia.com'),
