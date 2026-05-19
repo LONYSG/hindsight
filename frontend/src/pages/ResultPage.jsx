@@ -17,7 +17,7 @@ function shareKakao(result, tendencies, sessionId) {
   const badge       = tendencies[0]?.label ?? '투자자'
   const title       = beatMarket ? `🏆 시장을 이겼습니다! ${myReturnPct}` : `📉 시장에 졌습니다 ${myReturnPct}`
   const desc        = `알파 ${alphaPct} · 투자 성향: ${badge}\nHindsight에서 당신의 투자 성향을 확인해보세요`
-  const resultUrl   = `http://localhost:5173/result/${sessionId}`
+  const resultUrl   = `${window.location.origin}/result/${sessionId}`
 
   window.Kakao.Share.sendDefault({
     objectType: 'feed',
