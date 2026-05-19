@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { getState, nextDay, endSession } from '../api/play'
 import { useIsMobile } from '../hooks/useIsMobile'
+import { getDisplayTicker } from '../utils/companyDisplay'
 import PriceTab     from '../tabs/PriceTab'
 import OrderTab     from '../tabs/OrderTab'
 import PortfolioTab from '../tabs/PortfolioTab'
@@ -14,8 +15,8 @@ function formatDate(dateStr) {
   return `${y}.${String(m).padStart(2,'0')}.${String(d).padStart(2,'0')} (${day})`
 }
 
-function formatEvent(e) {
-  const t = e.companyTicker
+function formatEvent(e, simDate) {
+  const t = e.companyTicker ? getDisplayTicker(e.companyTicker, simDate) : null
   switch (e.eventType) {
     case 'PRICE_SPIKE':  return { icon: '📈', text: t ? `${t} 주가급변` : '주가급변',    color: '#ef4444' }
     case 'VOLUME_SPIKE': return { icon: '📊', text: t ? `${t} 거래량급증` : '거래량급증', color: '#6366f1' }
@@ -128,7 +129,7 @@ export default function PlayPage() {
                   <div style={s.notifEmpty}>이벤트 없음</div>
                 ) : (
                   events.map((e, i) => {
-                    const fmt = formatEvent(e)
+                    const fmt = formatEvent(e, simDate)
                     return (
                       <div key={i} style={s.notifItem}>
                         <span style={s.notifIconEl}>{fmt.icon}</span>

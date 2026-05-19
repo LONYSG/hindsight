@@ -1,9 +1,11 @@
+import { getDisplayTicker } from '../utils/companyDisplay'
+
 const fmt = (n, d = 2) => '$' + Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d })
 const pct = (r) => { const v = (Number(r ?? 0) * 100).toFixed(2); return `${Number(v) >= 0 ? '+' : ''}${v}%` }
 const pnlColor = (v) => Number(v) >= 0 ? '#f43f5e' : '#3b82f6'
 
 export default function PortfolioTab({ state }) {
-  const { portfolio, holdings = [] } = state
+  const { portfolio, holdings = [], simDate } = state
 
   return (
     <div style={s.root}>
@@ -27,7 +29,7 @@ export default function PortfolioTab({ state }) {
         <div style={s.section}>
           <div style={s.sectionTitle}>보유 종목</div>
           {holdings.map((h) => (
-            <HoldingCard key={h.companyId} h={h} />
+            <HoldingCard key={h.companyId} h={h} simDate={simDate} />
           ))}
         </div>
       ) : (
@@ -37,12 +39,13 @@ export default function PortfolioTab({ state }) {
   )
 }
 
-function HoldingCard({ h }) {
+function HoldingCard({ h, simDate }) {
   const pnl = Number(h.unrealizedPnl)
+  const displayTicker = getDisplayTicker(h.ticker, simDate)
   return (
     <div style={s.holdCard}>
       <div style={s.holdTop}>
-        <span style={s.ticker}>{h.ticker}</span>
+        <span style={s.ticker}>{displayTicker}</span>
         <span style={{ color: pnlColor(pnl), fontWeight: 600, fontSize: 14 }}>
           {pnl >= 0 ? '+' : ''}{fmt(pnl)}
         </span>

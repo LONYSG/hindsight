@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createChart, CandlestickSeries, LineSeries, HistogramSeries } from 'lightweight-charts'
 import { getCompanies, getPriceHistory, getIndicators } from '../api/data'
 import OrderBottomSheet from '../components/OrderBottomSheet'
+import { getDisplayTicker, getDisplayCompany } from '../utils/companyDisplay'
 
 const fmt    = (n) => '$' + Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtNum = (n) => Number(n ?? 0).toLocaleString('en-US')
@@ -346,7 +347,7 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
               }}
               onMouseDown={e => e.preventDefault()}
               onClick={() => setSelected(c)}>
-              {c.ticker}{held && <span style={s.dot} />}
+              {getDisplayTicker(c.ticker, simDate)}{held && <span style={s.dot} />}
             </button>
           )
         })}
@@ -419,7 +420,7 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
       {/* 바텀시트 주문창 */}
       {orderTab && (
         <OrderBottomSheet
-          company={selected}
+          company={getDisplayCompany(selected, simDate)}
           price={currentPrice}
           portfolio={portfolio}
           holdings={holdings}
