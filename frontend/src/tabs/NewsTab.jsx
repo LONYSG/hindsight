@@ -320,7 +320,7 @@ const s = {
   tickerRow:   { display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 },
   tickerChip:  { borderWidth: 1, borderStyle: 'solid', borderRadius: 6, padding: '3px 9px', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
   sectionEmpty:{ color: '#9ca3af', fontSize: 12, padding: '12px 0', textAlign: 'center' },
-  card:        { background: '#fff', borderRadius: 12, padding: '14px 16px', cursor: 'pointer', border: '1px solid #e8eaed' },
+  card:        { background: '#fff', borderRadius: 12, padding: '14px 16px', cursor: 'pointer', border: '1px solid #e8eaed', marginBottom: 10 },
   badges:      { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' },
   badge:       { fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4 },
   timingBadge: { fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 4, border: '1px solid #e5e7eb' },
