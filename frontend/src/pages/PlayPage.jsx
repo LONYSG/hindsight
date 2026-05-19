@@ -157,7 +157,6 @@ export default function PlayPage() {
             onClick={() => setActiveTab(key)}
           >
             {label}
-            {key === 'news' && <span style={s.dot} />}
           </button>
         ))}
       </div>
@@ -211,7 +210,6 @@ const s = {
   tabBar:     { display: 'flex', background: '#fff', borderBottom: '1px solid #e8eaed', flexShrink: 0 },
   tabBtn:     { flex: 1, background: 'none', border: 'none', borderBottom: '2px solid transparent', color: '#9ca3af', fontSize: 13, fontWeight: 500, cursor: 'pointer', position: 'relative' },
   tabActive:  { color: '#111827', borderBottom: '2px solid #111827', fontWeight: 700 },
-  dot:        { position: 'absolute', top: 8, right: '28%', width: 5, height: 5, borderRadius: '50%', background: '#f59e0b' },
 
   content:    { flex: 1, overflowY: 'auto', padding: '12px 16px', minHeight: 0 },
 
