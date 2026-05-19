@@ -193,11 +193,11 @@ const s = {
   header:     { position: 'sticky', top: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px', background: '#fff', borderBottom: '1px solid #f0f0f0', flexShrink: 0 },
   iconBtn:    { width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 10, flexShrink: 0 },
   date:       { position: 'absolute', left: '50%', transform: 'translateX(-50%)', color: '#111827', fontSize: 14, fontWeight: 600, letterSpacing: '-0.2px', pointerEvents: 'none', whiteSpace: 'nowrap' },
-  headerRight:{ display: 'flex', alignItems: 'center', gap: 8 },
+  headerRight:{ display: 'flex', alignItems: 'center', gap: 6, paddingRight: 8 },
 
   bellBtn:    { position: 'relative', background: 'none', border: 'none', borderRadius: 10, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, flexShrink: 0 },
   bellIcon:   { fontSize: 15, lineHeight: 1 },
-  bellBadge:  { position: 'absolute', top: -5, right: -5, background: '#ef4444', color: '#fff', borderRadius: '50%', width: 17, height: 17, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' },
+  bellBadge:  { position: 'absolute', top: 2, right: 2, background: '#ef4444', color: '#fff', borderRadius: 20, minWidth: 18, height: 18, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', pointerEvents: 'none', letterSpacing: 0 },
 
   notifPanel:  { position: 'absolute', top: 42, right: 0, width: 210, background: '#fff', border: '1px solid #e8eaed', borderRadius: 12, boxShadow: '0 6px 24px rgba(0,0,0,0.1)', zIndex: 200, overflow: 'hidden' },
   notifTitle:  { fontSize: 11, fontWeight: 700, color: '#9ca3af', padding: '10px 14px 8px', borderBottom: '1px solid #f3f4f6', letterSpacing: 0.3 },
@@ -206,7 +206,7 @@ const s = {
   notifIconEl: { fontSize: 16, flexShrink: 0 },
   notifText:   { fontSize: 13, fontWeight: 600, lineHeight: 1.3 },
 
-  endBtn:     { background: 'none', border: '1px solid #e8eaed', borderRadius: 8, color: '#6b7280', fontSize: 12, fontWeight: 500, padding: '6px 12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 },
+  endBtn:     { background: 'none', border: '1px solid #e8eaed', borderRadius: 8, color: '#6b7280', fontSize: 12, fontWeight: 500, padding: '6px 14px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 },
 
   tabBar:     { display: 'flex', background: '#fff', borderBottom: '1px solid #e8eaed', flexShrink: 0 },
   tabBtn:     { flex: 1, background: 'none', border: 'none', borderBottom: '2px solid transparent', color: '#9ca3af', fontSize: 13, fontWeight: 500, cursor: 'pointer', position: 'relative' },
