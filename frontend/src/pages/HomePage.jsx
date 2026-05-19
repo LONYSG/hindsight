@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getSessions, updateAlias, deleteSession } from '../api/play'
 import { getMe, updateNickname } from '../api/auth'
+import FullScreenLoader from '../components/FullScreenLoader'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -64,8 +65,10 @@ export default function HomePage() {
   const fmt = (v) => (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%'
   const returnColor = (v) => v > 0 ? '#16a34a' : v < 0 ? '#ef4444' : '#6b7280'
 
+  if (loading) return <FullScreenLoader />
+
   return (
-    <div style={s.container}>
+    <div style={s.container} className="page-enter">
       {/* 헤더 */}
       <div style={s.header}>
         <span style={s.logo}>Hindsight</span>
@@ -110,8 +113,7 @@ export default function HomePage() {
           + 새 시뮬레이션 시작
         </button>
 
-        {loading && <p style={s.empty}>불러오는 중...</p>}
-        {!loading && sessions.length === 0 && (
+        {sessions.length === 0 && (
           <p style={s.empty}>아직 플레이 기록이 없습니다.</p>
         )}
 

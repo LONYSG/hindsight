@@ -70,7 +70,7 @@ export default function ResultPage() {
   const maxAbs = Math.max(...compareItems.filter(it => !it.isDivider).map(it => Math.abs(it.value)), 0.01)
 
   return (
-    <div style={s.root}>
+    <div style={s.root} className="page-enter">
 
       {isOwner
         ? <AppHeader title="투자 결과 리포트" />

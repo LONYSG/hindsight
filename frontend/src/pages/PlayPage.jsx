@@ -3,6 +3,7 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { getState, nextDay, endSession } from '../api/play'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { getDisplayTicker } from '../utils/companyDisplay'
+import FullScreenLoader from '../components/FullScreenLoader'
 import PriceTab     from '../tabs/PriceTab'
 import OrderTab     from '../tabs/OrderTab'
 import PortfolioTab from '../tabs/PortfolioTab'
@@ -94,14 +95,14 @@ export default function PlayPage() {
     }
   }
 
-  if (loading) return <div style={s.center}>불러오는 중...</div>
-  if (!state)  return <div style={s.center}>데이터 없음</div>
+  if (loading) return <FullScreenLoader />
+  if (!state)  return <FullScreenLoader text="데이터를 불러올 수 없습니다" />
 
   const { simDate, events } = state
   const contentH = `calc(100vh - ${HEADER_H + TABBAR_H + FOOTER_H}px)`
 
   return (
-    <div style={s.root}>
+    <div style={s.root} className="page-enter">
 
       {/* 헤더 */}
       <div style={{ ...s.header, height: HEADER_H }}>

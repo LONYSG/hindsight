@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getStartPoints } from '../api/data'
 import { startSession } from '../api/play'
 import AppHeader from '../components/AppHeader'
+import FullScreenLoader from '../components/FullScreenLoader'
 
 const LOGO = (domain) => `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
 
@@ -109,13 +110,14 @@ const SCENARIO_CONTEXT = {
 export default function SetupPage() {
   const navigate = useNavigate()
   const [startPoints, setStartPoints] = useState([])
+  const [pageLoading, setPageLoading] = useState(true)
   const [modalSp, setModalSp] = useState(null) // 팝업에 표시할 시나리오
   const [seedMoney, setSeedMoney] = useState(10000)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    getStartPoints().then(r => setStartPoints(r.data))
+    getStartPoints().then(r => setStartPoints(r.data)).finally(() => setPageLoading(false))
   }, [])
 
   const handleStart = async () => {
@@ -134,8 +136,10 @@ export default function SetupPage() {
   const ctx = modalSp ? SCENARIO_CONTEXT[modalSp.startDate] : null
   const meta = modalSp ? SCENARIO_META[modalSp.startDate] ?? {} : {}
 
+  if (pageLoading) return <FullScreenLoader />
+
   return (
-    <div style={s.container}>
+    <div style={s.container} className="page-enter">
       <AppHeader title="새 시뮬레이션" />
       <div style={s.inner}>
         <h3 style={s.label}>시나리오 선택</h3>

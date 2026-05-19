@@ -15,7 +15,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={s.container}>
+    <div style={s.container} className="page-enter">
       <div style={s.card}>
         <div style={s.logo}>Hindsight</div>
         <p style={s.tagline}>과거로 돌아가 시장을 이겨라</p>
