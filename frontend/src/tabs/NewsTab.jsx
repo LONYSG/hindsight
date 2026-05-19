@@ -326,7 +326,7 @@ const s = {
   timingBadge: { fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 4, border: '1px solid #e5e7eb' },
   impBadge:    { fontSize: 11, marginLeft: 'auto' },
   toggle:      { color: '#d1d5db', fontSize: 10, marginLeft: 4 },
-  title:       { color: '#111827', fontSize: 13, fontWeight: 500, lineHeight: 1.5 },
+  title:       { color: '#111827', fontSize: 14, fontWeight: 700, lineHeight: 1.5 },
   brief:       { color: '#6b7280', fontSize: 12, marginTop: 4, lineHeight: 1.5 },
   titleEn:     { color: '#d1d5db', fontSize: 11, marginTop: 3, lineHeight: 1.4 },
   detail:      { marginTop: 12, borderTop: '1px solid #f3f4f6', paddingTop: 12 },
