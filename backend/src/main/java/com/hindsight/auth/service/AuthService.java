@@ -67,13 +67,9 @@ public class AuthService {
 
         Long kakaoId = ((Number) userInfo.get("id")).longValue();
         @SuppressWarnings("unchecked")
-        Map<String, Object> kakaoAccount = (Map<String, Object>) userInfo.get("kakao_account");
-        @SuppressWarnings("unchecked")
         Map<String, Object> properties = (Map<String, Object>) userInfo.get("properties");
 
-        String email = kakaoAccount != null ? (String) kakaoAccount.get("email") : null;
-        if (email == null) email = "kakao_" + kakaoId + "@hindsight.local";
-
+        String email = "kakao_" + kakaoId + "@hindsight.local";
         String nickname = properties != null ? (String) properties.get("nickname") : null;
         if (nickname == null) nickname = "투자자" + kakaoId % 10000;
 
@@ -112,12 +108,16 @@ public class AuthService {
     private Map<String, Object> fetchKakaoUserInfo(String accessToken) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("property_keys", "[\"properties.nickname\"]");
 
         try {
             ResponseEntity<Map> response = restTemplate.exchange(
                     "https://kapi.kakao.com/v2/user/me",
-                    HttpMethod.GET,
-                    new HttpEntity<>(headers),
+                    HttpMethod.POST,
+                    new HttpEntity<>(params, headers),
                     Map.class
             );
             return response.getBody();
