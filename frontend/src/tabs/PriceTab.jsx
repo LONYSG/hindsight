@@ -354,7 +354,7 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
       </div>
 
       {/* 지표 토글 */}
-      <div style={s.indRow}>
+      <div style={s.indRow} className="hide-scrollbar">
         <span style={s.group}>
           <button style={{ ...s.ind, borderColor: showVol ? '#64748b' : '#e5e7eb', color: showVol ? '#475569' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleVol}>거래량</button>
         </span>
@@ -441,7 +441,7 @@ const s = {
   chipActive: { borderColor: '#22c55e', color: '#16a34a' },
   chipHeld:   { borderColor: '#fcd34d', color: '#92400e' },
   dot:        { position: 'absolute', top: 2, right: 2, width: 4, height: 4, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' },
-  indRow:     { display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 },
+  indRow:     { display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' },
   group:      { display: 'flex', gap: 4 },
   sep:        { width: 1, height: 12, background: '#e5e7eb' },
   ind:        { background: '#fff', borderWidth: 1, borderStyle: 'solid', borderColor: '#e5e7eb', borderRadius: 5, padding: '3px 7px', color: '#9ca3af', fontSize: 10, fontWeight: 700, cursor: 'pointer', outline: 'none' },
