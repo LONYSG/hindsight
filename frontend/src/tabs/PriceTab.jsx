@@ -335,7 +335,7 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
   return (
     <div style={s.root}>
       {/* 기업 선택 */}
-      <div style={s.companyRow}>
+      <div style={s.companyRow} className="hide-scrollbar">
         {companies.map(c => {
           const isSel = selected?.id === c.id
           const held  = holdings.some(h => h.companyId === c.id)
@@ -436,15 +436,15 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
 
 const s = {
   root:       { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', gap: 6 },
-  companyRow: { display: 'flex', flexWrap: 'wrap', gap: 4, flexShrink: 0 },
-  chip:       { background: '#fff', borderWidth: 1, borderStyle: 'solid', borderColor: '#e5e7eb', borderRadius: 6, padding: '4px 8px', color: '#9ca3af', fontSize: 11, fontWeight: 700, cursor: 'pointer', position: 'relative', outline: 'none' },
+  companyRow: { display: 'flex', flexWrap: 'nowrap', gap: 4, flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' },
+  chip:       { background: '#fff', borderWidth: 1, borderStyle: 'solid', borderColor: '#e5e7eb', borderRadius: 6, padding: '4px 8px', color: '#9ca3af', fontSize: 11, fontWeight: 700, cursor: 'pointer', position: 'relative', outline: 'none', flexShrink: 0 },
   chipActive: { borderColor: '#22c55e', color: '#16a34a' },
   chipHeld:   { borderColor: '#fcd34d', color: '#92400e' },
   dot:        { position: 'absolute', top: 2, right: 2, width: 4, height: 4, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' },
   indRow:     { display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' },
   group:      { display: 'flex', gap: 4 },
   sep:        { width: 1, height: 12, background: '#e5e7eb' },
-  ind:        { background: '#fff', borderWidth: 1, borderStyle: 'solid', borderColor: '#e5e7eb', borderRadius: 5, padding: '3px 7px', color: '#9ca3af', fontSize: 10, fontWeight: 700, cursor: 'pointer', outline: 'none' },
+  ind:        { background: '#fff', borderWidth: 1, borderStyle: 'solid', borderColor: '#e5e7eb', borderRadius: 5, padding: '3px 7px', color: '#9ca3af', fontSize: 10, fontWeight: 700, cursor: 'pointer', outline: 'none', flexShrink: 0 },
   volOn:      { borderColor: '#64748b', color: '#475569' },
   bbOn:       { borderColor: '#8b5cf6', color: '#7c3aed' },
   ichiOn:     { borderColor: '#d946ef', color: '#a21caf' },
