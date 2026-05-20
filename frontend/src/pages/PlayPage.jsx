@@ -59,7 +59,7 @@ export default function PlayPage() {
   const [ending, setEnding]       = useState(false)
   const [bellOpen, setBellOpen]   = useState(false)
 
-  const startDate = location.state?.startDate || '2020-02-01'
+  const startDate = state?.startDate || location.state?.startDate || '2020-02-03'
 
   useEffect(() => {
     if (!state) {

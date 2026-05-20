@@ -80,6 +80,23 @@ const BASE_OPTS = {
 
 const MA_COLORS = { 5: '#f59e0b', 20: '#60a5fa', 60: '#4ade80' }
 
+// 에피소드 시작일 기준 시총 순서 (분할 조정 가격 × 발행주식수로 산출)
+const MARKET_CAP_ORDER = {
+  '2020-02-03': ['MSFT', 'AAPL', 'AMZN', 'GOOGL', 'META', 'TSLA', 'NVDA'],
+  '2021-11-01': ['MSFT', 'AAPL', 'AMZN', 'GOOGL', 'TSLA', 'META', 'NVDA'],
+  '2023-01-03': ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META'],
+}
+
+function sortByMarketCap(companies, startDate) {
+  const order = MARKET_CAP_ORDER[startDate]
+  if (!order) return companies
+  return [...companies].sort((a, b) => {
+    const ia = order.indexOf(a.ticker)
+    const ib = order.indexOf(b.ticker)
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
+  })
+}
+
 export default function PriceTab({ state, startDate, sessionId, onTraded }) {
   const { simDate, holdings = [], portfolio } = state
   const [orderTab, setOrderTab] = useState(null) // 'BUY' | 'SELL' | null
@@ -336,50 +353,63 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
     <div style={s.root}>
       {/* 기업 선택 */}
       <div style={s.companyRow} className="hide-scrollbar">
-        {companies.map(c => {
-          const isSel = selected?.id === c.id
-          const held  = holdings.some(h => h.companyId === c.id)
-          return (
-            <button key={c.id}
-              style={{ ...s.chip,
-                borderColor: isSel ? '#22c55e' : held ? '#fcd34d' : '#e5e7eb',
-                color:       isSel ? '#16a34a' : held ? '#92400e' : '#9ca3af',
-              }}
-              onMouseDown={e => e.preventDefault()}
-              onClick={() => setSelected(c)}>
-              {getDisplayTicker(c.ticker, simDate)}{held && <span style={s.dot} />}
-            </button>
+        {(() => {
+          const held = companies
+            .filter(c => holdings.some(h => h.companyId === c.id))
+            .sort((a, b) => {
+              const va = Number(holdings.find(h => h.companyId === a.id)?.stockValue ?? 0)
+              const vb = Number(holdings.find(h => h.companyId === b.id)?.stockValue ?? 0)
+              return vb - va
+            })
+          const notHeld = sortByMarketCap(
+            companies.filter(c => !holdings.some(h => h.companyId === c.id)),
+            startDate
           )
-        })}
+          const renderChip = (c) => {
+            const isSel = selected?.id === c.id
+            return (
+              <button key={c.id}
+                style={{ ...s.chip,
+                  borderColor: isSel ? '#22c55e' : '#e5e7eb',
+                  color:       isSel ? '#16a34a' : '#6b7280',
+                }}
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => setSelected(c)}>
+                {getDisplayTicker(c.ticker, simDate)}
+              </button>
+            )
+          }
+          return (
+            <>
+              {held.map(renderChip)}
+              {held.length > 0 && <div style={s.sep} />}
+              {notHeld.map(renderChip)}
+            </>
+          )
+        })()}
       </div>
 
       {/* 지표 토글 */}
       <div style={s.indRow} className="hide-scrollbar">
-        <span style={s.group}>
-          <button style={{ ...s.ind, borderColor: showVol ? '#64748b' : '#e5e7eb', color: showVol ? '#475569' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleVol}>거래량</button>
-        </span>
-        <div style={s.sep} />
-        <span style={s.group}>
-          {[5, 20, 60].map(p => (
-            <button key={p} style={{ ...s.ind, borderColor: showMA[p] ? MA_COLORS[p] + 'bb' : '#e5e7eb', color: showMA[p] ? MA_COLORS[p] : '#9ca3af' }}
-              onMouseDown={e => e.preventDefault()} onClick={() => toggleMA(p)}>MA{p}</button>
-          ))}
-          <button style={{ ...s.ind, borderColor: showBB ? '#8b5cf6' : '#e5e7eb', color: showBB ? '#7c3aed' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleBB}>BB</button>
-          <button style={{ ...s.ind, borderColor: showIchi ? '#d946ef' : '#e5e7eb', color: showIchi ? '#a21caf' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleIchi}>일목</button>
-        </span>
-        <div style={s.sep} />
-        <span style={s.group}>
-          <button style={{ ...s.ind, borderColor: showRSI ? '#a78bfa' : '#e5e7eb', color: showRSI ? '#7c3aed' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleRSI}>RSI</button>
-          <button style={{ ...s.ind, borderColor: showMACD ? '#60a5fa' : '#e5e7eb', color: showMACD ? '#2563eb' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleMACD}>MACD</button>
-        </span>
+        <button style={{ ...s.ind, borderColor: showVol ? '#64748b' : '#e5e7eb', color: showVol ? '#475569' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleVol}>거래량</button>
+        {[5, 20, 60].map(p => (
+          <button key={p} style={{ ...s.ind, borderColor: showMA[p] ? MA_COLORS[p] + 'bb' : '#e5e7eb', color: showMA[p] ? MA_COLORS[p] : '#9ca3af' }}
+            onMouseDown={e => e.preventDefault()} onClick={() => toggleMA(p)}>MA{p}</button>
+        ))}
+        <button style={{ ...s.ind, borderColor: showBB ? '#8b5cf6' : '#e5e7eb', color: showBB ? '#7c3aed' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleBB}>BB</button>
+        <button style={{ ...s.ind, borderColor: showIchi ? '#d946ef' : '#e5e7eb', color: showIchi ? '#a21caf' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleIchi}>일목</button>
+        <button style={{ ...s.ind, borderColor: showRSI ? '#a78bfa' : '#e5e7eb', color: showRSI ? '#7c3aed' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleRSI}>RSI</button>
+        <button style={{ ...s.ind, borderColor: showMACD ? '#60a5fa' : '#e5e7eb', color: showMACD ? '#2563eb' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleMACD}>MACD</button>
       </div>
 
       {/* 현재가 */}
       {price && (
         <div style={s.priceRow}>
-          <span style={{ color: up ? upColor : dnColor, fontSize: 22, fontWeight: 700, letterSpacing: '-0.5px' }}>{fmt(price.close)}</span>
-          <span style={{ color: up ? upColor : dnColor, fontSize: 12, fontWeight: 600 }}>{up ? '▲' : '▼'} {Math.abs(dayChgPct).toFixed(2)}%</span>
-          <span style={{ color: '#9ca3af', fontSize: 11 }}>H {fmt(price.high)} · L {fmt(price.low)} · {fmtNum(price.volume)}</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ color: up ? upColor : dnColor, fontSize: 22, fontWeight: 700, letterSpacing: '-0.5px' }}>{fmt(price.close)}</span>
+            <span style={{ color: up ? upColor : dnColor, fontSize: 12, fontWeight: 600 }}>{up ? '▲' : '▼'} {Math.abs(dayChgPct).toFixed(2)}%</span>
+          </div>
+          <div style={{ color: '#9ca3af', fontSize: 11 }}>H {fmt(price.high)} · L {fmt(price.low)} · {fmtNum(price.volume)}</div>
         </div>
       )}
 
@@ -442,15 +472,15 @@ const s = {
   chipHeld:   { borderColor: '#fcd34d', color: '#92400e' },
   dot:        { position: 'absolute', top: 2, right: 2, width: 4, height: 4, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' },
   indRow:     { display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' },
-  group:      { display: 'flex', gap: 4 },
-  sep:        { width: 1, height: 12, background: '#e5e7eb' },
+  group:      { display: 'flex', gap: 4, flexShrink: 0 },
+  sep:        { width: 1, alignSelf: 'stretch', background: '#e5e7eb', flexShrink: 0 },
   ind:        { background: '#fff', borderWidth: 1, borderStyle: 'solid', borderColor: '#e5e7eb', borderRadius: 5, padding: '3px 7px', color: '#9ca3af', fontSize: 10, fontWeight: 700, cursor: 'pointer', outline: 'none', flexShrink: 0 },
   volOn:      { borderColor: '#64748b', color: '#475569' },
   bbOn:       { borderColor: '#8b5cf6', color: '#7c3aed' },
   ichiOn:     { borderColor: '#d946ef', color: '#a21caf' },
   rsiOn:      { borderColor: '#a78bfa', color: '#7c3aed' },
   macdOn:     { borderColor: '#60a5fa', color: '#2563eb' },
-  priceRow:   { display: 'flex', alignItems: 'baseline', gap: 8, flexShrink: 0 },
+  priceRow:   { display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 },
   panel:      { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, borderTop: '1px solid #e5e7eb' },
   panelHdr:   { display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0', fontSize: 10, flexShrink: 0 },
   tradeRow:   { display: 'flex', gap: 8, flexShrink: 0 },

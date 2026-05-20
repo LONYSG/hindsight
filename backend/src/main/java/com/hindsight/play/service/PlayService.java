@@ -306,6 +306,7 @@ public class PlayService {
         return new SessionStateResponse(
                 sessionId,
                 simDate,
+                session.getStartPoint().getStartDate(),
                 holdings,
                 new SessionStateResponse.PortfolioInfo(
                         snapshot.getCash(),

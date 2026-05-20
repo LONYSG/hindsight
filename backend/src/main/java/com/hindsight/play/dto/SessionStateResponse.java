@@ -7,8 +7,9 @@ import java.util.List;
 public record SessionStateResponse(
         Long sessionId,
         LocalDate simDate,
-        List<HoldingInfo> holdings,   // 보유 종목별 현황
-        PortfolioInfo portfolio,       // 포트폴리오 총합
+        LocalDate startDate,
+        List<HoldingInfo> holdings,
+        PortfolioInfo portfolio,
         List<EventInfo> events
 ) {
     // 보유 종목별 현황 (보유 수량 > 0인 기업만)
