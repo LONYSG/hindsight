@@ -33,4 +33,8 @@ public interface TradeHistoryRepository extends JpaRepository<TradeHistory, Long
 
     // 총 거래 횟수
     long countBySessionId(Long sessionId);
+
+    List<TradeHistory> findBySessionId(Long sessionId);
+
+    void deleteBySessionId(Long sessionId);
 }

@@ -8,3 +8,9 @@ export const signup = (email, password) =>
 
 export const kakaoLogin = (code) =>
   client.post('/auth/kakao', { code })
+
+export const getMe = () =>
+  client.get('/auth/me')
+
+export const updateNickname = (nickname) =>
+  client.patch('/auth/me/nickname', { nickname })

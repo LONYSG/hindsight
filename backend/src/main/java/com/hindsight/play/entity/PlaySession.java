@@ -51,8 +51,16 @@ public class PlaySession {
         this.updatedAt = LocalDateTime.now();
     }
 
+    @Column(length = 100)
+    private String alias;
+
     public void advanceDate(LocalDate newDate) {
         this.simDate = newDate;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void updateAlias(String alias) {
+        this.alias = alias;
         this.updatedAt = LocalDateTime.now();
     }
 

@@ -57,7 +57,7 @@ public class AuthService {
             throw new BadCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
 
-        return new TokenResponse(tokenProvider.generateToken(user.getEmail()));
+        return new TokenResponse(tokenProvider.generateToken(user.getEmail()), user.getPasswordHash() != null);
     }
 
     @Transactional
@@ -68,14 +68,21 @@ public class AuthService {
         Long kakaoId = ((Number) userInfo.get("id")).longValue();
         @SuppressWarnings("unchecked")
         Map<String, Object> kakaoAccount = (Map<String, Object>) userInfo.get("kakao_account");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> properties = (Map<String, Object>) userInfo.get("properties");
+
         String email = kakaoAccount != null ? (String) kakaoAccount.get("email") : null;
         if (email == null) email = "kakao_" + kakaoId + "@hindsight.local";
 
-        String finalEmail = email;
-        User user = userRepository.findByKakaoId(kakaoId)
-                .orElseGet(() -> userRepository.save(User.ofKakao(kakaoId, finalEmail)));
+        String nickname = properties != null ? (String) properties.get("nickname") : null;
+        if (nickname == null) nickname = "투자자" + kakaoId % 10000;
 
-        return new TokenResponse(tokenProvider.generateToken(user.getEmail()));
+        String finalEmail = email;
+        String finalNickname = nickname;
+        User user = userRepository.findByKakaoId(kakaoId)
+                .orElseGet(() -> userRepository.save(User.ofKakao(kakaoId, finalEmail, finalNickname)));
+
+        return new TokenResponse(tokenProvider.generateToken(user.getEmail()), user.getNickname() != null);
     }
 
     private String fetchKakaoAccessToken(String code) {

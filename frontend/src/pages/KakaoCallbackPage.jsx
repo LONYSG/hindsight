@@ -20,7 +20,7 @@ export default function KakaoCallbackPage() {
     kakaoLogin(code)
       .then(res => {
         localStorage.setItem('token', res.data.accessToken)
-        navigate('/home')
+        navigate(res.data.hasNickname ? '/home' : '/nickname-setup', { replace: true })
       })
       .catch(err => {
         const msg = err.response?.data?.message || err.message || '알 수 없는 오류'

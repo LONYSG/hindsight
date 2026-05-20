@@ -27,6 +27,9 @@ public class User {
     @Column(unique = true)
     private Long kakaoId;
 
+    @Column(length = 100)
+    private String nickname;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -37,10 +40,13 @@ public class User {
         this.createdAt = LocalDateTime.now();
     }
 
-    public static User ofKakao(Long kakaoId, String email) {
+    public void updateNickname(String nickname) { this.nickname = nickname; }
+
+    public static User ofKakao(Long kakaoId, String email, String nickname) {
         User user = new User();
         user.kakaoId = kakaoId;
         user.email = email;
+        user.nickname = nickname;
         user.createdAt = LocalDateTime.now();
         return user;
     }

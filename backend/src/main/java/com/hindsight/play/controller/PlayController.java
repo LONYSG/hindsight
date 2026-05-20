@@ -14,6 +14,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/play/sessions")
@@ -62,5 +63,24 @@ public class PlayController {
             @Valid @RequestBody TradeRequest request
     ) {
         return playService.trade(userDetails.getUsername(), sessionId, request);
+    }
+
+    @PatchMapping("/{sessionId}/alias")
+    public Map<String, String> updateAlias(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long sessionId,
+            @RequestBody Map<String, String> body
+    ) {
+        playService.updateAlias(userDetails.getUsername(), sessionId, body.get("alias"));
+        return Map.of("alias", body.get("alias"));
+    }
+
+    @DeleteMapping("/{sessionId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSession(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long sessionId
+    ) {
+        playService.deleteSession(userDetails.getUsername(), sessionId);
     }
 }

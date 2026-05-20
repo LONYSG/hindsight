@@ -3,6 +3,12 @@ import client from './client'
 export const getSessions = () =>
   client.get('/play/sessions')
 
+export const updateAlias = (sessionId, alias) =>
+  client.patch(`/play/sessions/${sessionId}/alias`, { alias })
+
+export const deleteSession = (sessionId) =>
+  client.delete(`/play/sessions/${sessionId}`)
+
 export const startSession = (startPointId, seedMoney) =>
   client.post('/play/sessions', { startPointId, seedMoney })
 

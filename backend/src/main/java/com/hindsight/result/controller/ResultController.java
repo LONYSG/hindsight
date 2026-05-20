@@ -27,6 +27,7 @@ public class ResultController {
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long sessionId
     ) {
+        if (userDetails == null) return resultService.getResultPublic(sessionId);
         return resultService.getResult(userDetails.getUsername(), sessionId);
     }
 }

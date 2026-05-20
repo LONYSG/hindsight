@@ -104,6 +104,15 @@ public class ResultService {
         return toResponse(session, result);
     }
 
+    // 비로그인 공유 링크용 — 소유자 검증 없이 결과 조회
+    public PlayResultResponse getResultPublic(Long sessionId) {
+        PlaySession session = playSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("세션을 찾을 수 없습니다."));
+        PlayResult result = playResultRepository.findBySessionId(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("결과가 없습니다."));
+        return toResponse(session, result);
+    }
+
     private PlayResultResponse toResponse(PlaySession session, PlayResult result) {
         var snapshot = portfolioSnapshotRepository
                 .findTopBySessionIdOrderByDateDesc(session.getId()).orElseThrow();
@@ -114,8 +123,13 @@ public class ResultService {
         LocalDate startDate = session.getStartPoint().getStartDate();
         LocalDate endDate   = session.getSimDate();
 
+        String playerName = userRepository.findById(session.getUserId())
+                .map(u -> u.getNickname() != null ? u.getNickname() : "익명 투자자")
+                .orElse("익명 투자자");
+
         return new PlayResultResponse(
                 session.getId(),
+                playerName,
                 startDate,
                 endDate,
                 session.getSeedMoney(),

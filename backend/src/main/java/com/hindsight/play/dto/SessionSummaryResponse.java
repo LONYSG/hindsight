@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 
 public record SessionSummaryResponse(
         Long sessionId,
+        String alias,
         String startPointName,
         LocalDate startDate,
         BigDecimal seedMoney,

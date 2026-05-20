@@ -17,6 +17,7 @@ import com.hindsight.play.entity.PlaySession;
 import com.hindsight.play.entity.PortfolioSnapshot;
 import com.hindsight.play.repository.PlaySessionRepository;
 import com.hindsight.play.repository.PortfolioSnapshotRepository;
+import com.hindsight.result.repository.PlayResultRepository;
 import com.hindsight.trade.dto.TradeRequest;
 import com.hindsight.trade.entity.TradeHistory;
 import com.hindsight.trade.repository.TradeHistoryRepository;
@@ -40,6 +41,7 @@ public class PlayService {
     private final PlaySessionRepository playSessionRepository;
     private final PortfolioSnapshotRepository portfolioSnapshotRepository;
     private final TradeHistoryRepository tradeHistoryRepository;
+    private final PlayResultRepository playResultRepository;
     private final StartPointRepository startPointRepository;
     private final CompanyRepository companyRepository;
     private final DailyPriceRepository dailyPriceRepository;
@@ -90,8 +92,10 @@ public class PlayService {
                             ? snap.getTotalValue().subtract(s.getSeedMoney())
                                   .divide(s.getSeedMoney(), 4, RoundingMode.HALF_UP)
                             : BigDecimal.ZERO;
+                    String alias = s.getAlias() != null ? s.getAlias() : s.getStartPoint().getName();
                     return new SessionSummaryResponse(
                             s.getId(),
+                            alias,
                             s.getStartPoint().getName(),
                             s.getStartPoint().getStartDate(),
                             s.getSeedMoney(),
@@ -102,6 +106,23 @@ public class PlayService {
                     );
                 })
                 .toList();
+    }
+
+    @Transactional
+    public void updateAlias(String email, Long sessionId, String alias) {
+        PlaySession session = findSessionByOwner(email, sessionId);
+        if (alias == null || alias.isBlank()) throw new IllegalArgumentException("별칭을 입력해주세요.");
+        if (alias.length() > 30) throw new IllegalArgumentException("별칭은 30자 이내로 입력해주세요.");
+        session.updateAlias(alias.trim());
+    }
+
+    @Transactional
+    public void deleteSession(String email, Long sessionId) {
+        PlaySession session = findSessionByOwner(email, sessionId);
+        portfolioSnapshotRepository.deleteAll(portfolioSnapshotRepository.findBySessionIdOrderByDateAsc(sessionId));
+        tradeHistoryRepository.deleteBySessionId(sessionId);
+        playResultRepository.deleteBySessionId(sessionId);
+        playSessionRepository.delete(session);
     }
 
     @Transactional(readOnly = true)

@@ -6,13 +6,14 @@ import java.util.List;
 
 public record PlayResultResponse(
         Long sessionId,
+        String playerName,
         LocalDate startDate,
         LocalDate endDate,
         BigDecimal seedMoney,
         BigDecimal finalValue,
         BigDecimal myReturn,
         BigDecimal nasdaqReturn,
-        BigDecimal alpha,          // vs NASDAQ
+        BigDecimal alpha,
         int tradeCount,
         BigDecimal mdd,
         BigDecimal cashRatioAvg,
