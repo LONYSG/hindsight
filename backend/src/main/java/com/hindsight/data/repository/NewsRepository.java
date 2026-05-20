@@ -11,6 +11,8 @@ import java.util.List;
 
 public interface NewsRepository extends JpaRepository<News, Long> {
 
+    List<News> findByEsIdIn(List<String> esIds);
+
     @Query("""
         SELECT n FROM News n
         WHERE n.publishedAt > :from AND n.publishedAt <= :to
