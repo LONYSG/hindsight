@@ -4,10 +4,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # FRED API
-FRED_API_KEY = os.environ["FRED_API_KEY"]
+FRED_API_KEY = os.getenv("FRED_API_KEY", "")
 
 # Tiingo API (주가 데이터 - 무료, adjusted 포함, 전체 기간)
-TIINGO_API_KEY = os.environ["TIINGO_API_KEY"]
+TIINGO_API_KEY = os.getenv("TIINGO_API_KEY", "")
 
 # Gemini API
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
@@ -37,7 +37,7 @@ FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY", "")
 
 # NYT API
-NYT_API_KEY = os.environ["NYT_API_KEY"]
+NYT_API_KEY = os.getenv("NYT_API_KEY", "")
 
 # Google Cloud / BigQuery (GDELT 뉴스 수집)
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "hindsight-496200")

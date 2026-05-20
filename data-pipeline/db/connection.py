@@ -15,7 +15,8 @@ def get_connection():
         port=settings.POSTGRES_PORT,
         dbname=settings.POSTGRES_DB,
         user=settings.POSTGRES_USER,
-        password=settings.POSTGRES_PASSWORD
+        password=settings.POSTGRES_PASSWORD,
+        prepare_threshold=None  # PgBouncer Transaction mode 호환
     )
     try:
         yield conn
