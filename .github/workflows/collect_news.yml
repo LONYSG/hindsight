@@ -66,7 +66,7 @@ jobs:
         run: |
           python -c "
           from collectors.company_news_collector import collect
-          collect('${{ inputs.start_date }}', '${{ inputs.end_date }}')
+          collect(start_date='${{ inputs.start_date }}', end_date='${{ inputs.end_date }}')
           print('Alpha Vantage 수집 완료')
           "
 
