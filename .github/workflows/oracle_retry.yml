@@ -19,24 +19,18 @@ jobs:
           OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.oci
-          python3 -c "import os; open('/home/runner/.oci/oci_api_key.pem','w').write(os.environ['OCI_PRIVATE_KEY'])"
+          printf '%s' "$OCI_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
           chmod 600 ~/.oci/oci_api_key.pem
-          python3 -c "
-          config = '''[DEFAULT]
-user=ocid1.user.oc1..aaaaaaaay442ktjd35xlnnbsbottvw723mnfapv3hlvk2aivbtc4yoqtd37a
-fingerprint=4d:0c:6a:9d:73:65:f1:7b:34:4d:71:9d:21:ed:1c:56
-tenancy=ocid1.tenancy.oc1..aaaaaaaadrdhymala26cqiimwt5srdjey7bmqdn6t76ljgv6oqt5c6lyfbsq
-region=ap-chuncheon-1
-key_file=/home/runner/.oci/oci_api_key.pem
-'''
-open('/home/runner/.oci/config','w').write(config)
-"
+          {
+            echo '[DEFAULT]'
+            echo 'user=ocid1.user.oc1..aaaaaaaay442ktjd35xlnnbsbottvw723mnfapv3hlvk2aivbtc4yoqtd37a'
+            echo 'fingerprint=4d:0c:6a:9d:73:65:f1:7b:34:4d:71:9d:21:ed:1c:56'
+            echo 'tenancy=ocid1.tenancy.oc1..aaaaaaaadrdhymala26cqiimwt5srdjey7bmqdn6t76ljgv6oqt5c6lyfbsq'
+            echo 'region=ap-chuncheon-1'
+            echo 'key_file=/home/runner/.oci/oci_api_key.pem'
+          } > ~/.oci/config
           chmod 600 ~/.oci/config
-
-          # SSH 공개키 저장
-          cat > /tmp/hindsight_rsa.pub << 'EOF'
-          ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDpTM4BOK7TZd4aoyXdRJhPpllkPiyzfK1LIRZaLlXhYzrZgYRz/aZFPaFZA/Hd9FJvasUmmfoLXiSqGA9a3cp9SyNpQ+ieXy0eFC7zA7/8BHNsllvhI9ovsIsmsukgPvuCJ4+8+0aqdem4nGq5bARI6RldyyeCwN/tkK8f0Oc6lw87/P6TW/3bcXqxaeRU759oRWKTHXKNThx/NW7CEqkBNa2j2vJYiVhfVSmeTZpIPh1MK8RpdWn6sjDgzEMR3XkMsFMnpaY5t3bap+lF3J6JfpGJwnj8T53ljh4GPt+mmu5rZb+fHUmLwNOXSWOgvP3QwsyUaovc8HyJse5uxMkOr7o1bfbxBUTYFhBZJn5HOG30R4gJFL38cYNM9nfjmheXcrfeaQwilEPbUHCsZBh8YnRuzB1AdLEXUsiM5TSw8iIjn3PtgCvX13F0uZnTCkC4Qp2jBSBPeNXvcHyGsQhzbzmxA5OT0twyYdgDO1+0hS9xy1Y5qD2hULufzPwudQbR2ISKrnzZbAusWVhmCmCa3MlHfbnyaGzuXRknmflCCTzP4aiIfdDb9GPGAlCXN7WVCSX9XKtsgwB6YIfFoXL0MTcjTzKvFOLpo+naVI3e3WbGvl8swhOIRVqbrBi8v/Ob+vikZgbuVD1rS457lUMCjO8gFAwqF42tBf/D5LMTZQ== lonysg@NT750XGR-A31A
-          EOF
+          echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDpTM4BOK7TZd4aoyXdRJhPpllkPiyzfK1LIRZaLlXhYzrZgYRz/aZFPaFZA/Hd9FJvasUmmfoLXiSqGA9a3cp9SyNpQ+ieXy0eFC7zA7/8BHNsllvhI9ovsIsmsukgPvuCJ4+8+0aqdem4nGq5bARI6RldyyeCwN/tkK8f0Oc6lw87/P6TW/3bcXqxaeRU759oRWKTHXKNThx/NW7CEqkBNa2j2vJYiVhfVSmeTZpIPh1MK8RpdWn6sjDgzEMR3XkMsFMnpaY5t3bap+lF3J6JfpGJwnj8T53ljh4GPt+mmu5rZb+fHUmLwNOXSWOgvP3QwsyUaovc8HyJse5uxMkOr7o1bfbxBUTYFhBZJn5HOG30R4gJFL38cYNM9nfjmheXcrfeaQwilEPbUHCsZBh8YnRuzB1AdLEXUsiM5TSw8iIjn3PtgCvX13F0uZnTCkC4Qp2jBSBPeNXvcHyGsQhzbzmxA5OT0twyYdgDO1+0hS9xy1Y5qD2hULufzPwudQbR2ISKrnzZbAusWVhmCmCa3MlHfbnyaGzuXRknmflCCTzP4aiIfdDb9GPGAlCXN7WVCSX9XKtsgwB6YIfFoXL0MTcjTzKvFOLpo+naVI3e3WbGvl8swhOIRVqbrBi8v/Ob+vikZgbuVD1rS457lUMCjO8gFAwqF42tBf/D5LMTZQ== lonysg@NT750XGR-A31A' > /tmp/hindsight_rsa.pub
 
       - name: ARM 인스턴스 생성 재시도 (최대 5시간 50분)
         run: |
