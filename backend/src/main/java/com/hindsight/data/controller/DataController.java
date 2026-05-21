@@ -1,6 +1,7 @@
 package com.hindsight.data.controller;
 
 import com.hindsight.data.dto.CompanyResponse;
+import com.hindsight.data.dto.EtfSummaryResponse;
 import com.hindsight.data.dto.IndicatorResponse;
 import com.hindsight.data.dto.MacroResponse;
 import com.hindsight.data.dto.NewsResponse;
@@ -38,10 +39,27 @@ public class DataController {
                 .toList();
     }
 
+    private static final java.util.Set<String> ETF_TICKERS = java.util.Set.of(
+            "SOXX", "XLK", "XLE", "XLF", "XLV", "XLI", "XLY"
+    );
+
     @GetMapping("/companies")
     public List<CompanyResponse> getCompanies() {
         return companyRepository.findAll().stream()
+                .filter(c -> !ETF_TICKERS.contains(c.getTicker()))
                 .map(CompanyResponse::from)
+                .toList();
+    }
+
+    @GetMapping("/etf-summary")
+    public List<EtfSummaryResponse> getEtfSummary(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return companyRepository.findAll().stream()
+                .filter(c -> ETF_TICKERS.contains(c.getTicker()))
+                .map(c -> EtfSummaryResponse.from(c,
+                        dailyPriceRepository.findByCompanyIdAndDateBetweenOrderByDateAsc(c.getId(), from, to)))
                 .toList();
     }
 

@@ -52,3 +52,20 @@ input[type='number']::-webkit-outer-spin-button {
 }
 
 .hide-scrollbar::-webkit-scrollbar { display: none; }
+
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ticker-scroll 50s linear infinite;
+  will-change: transform;
+}
+
+.ticker-track:hover,
+.ticker-track.paused {
+  animation-play-state: paused;
+}

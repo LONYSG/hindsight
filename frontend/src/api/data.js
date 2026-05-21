@@ -13,3 +13,6 @@ export const getIndicators = (companyId, from, to) =>
 
 export const getMacro = (from, to) =>
   client.get('/data/macro', { params: { from, to } })
+
+export const getEtfSummary = (from, to) =>
+  client.get('/data/etf-summary', { params: { from, to } })

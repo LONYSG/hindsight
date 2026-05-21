@@ -159,7 +159,7 @@ function Row({ label, value, bold, dim, warn }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #f3f4f6' }}>
       <span style={{ color: '#6b7280', fontSize: 13 }}>{label}</span>
-      <span style={{ color: warn ? '#ef4444' : dim ? '#6b7280' : bold ? '#111827' : '#6b7280', fontSize: 13, fontWeight: bold || warn ? 700 : 500 }}>{value}</span>
+      <span style={{ color: warn ? '#3b82f6' : dim ? '#6b7280' : bold ? '#111827' : '#6b7280', fontSize: 13, fontWeight: bold || warn ? 700 : 500 }}>{value}</span>
     </div>
   )
 }
@@ -185,5 +185,5 @@ const s = {
   pctBtn:      { flex: 1, background: '#f5f6f8', borderWidth: 1, borderStyle: 'solid', borderColor: '#e5e7eb', borderRadius: 8, padding: '8px 0', color: '#6b7280', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
   orderInfo:   { marginBottom: 16 },
   orderBtn:    { width: '100%', border: 'none', borderRadius: 10, padding: '14px', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' },
-  warnBox:     { background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#ef4444', fontWeight: 600, textAlign: 'center', marginBottom: 12 },
+  warnBox:     { background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#3b82f6', fontWeight: 600, textAlign: 'center', marginBottom: 12 },
 }

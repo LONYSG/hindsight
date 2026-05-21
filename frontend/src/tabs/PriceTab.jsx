@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createChart, CandlestickSeries, LineSeries, HistogramSeries } from 'lightweight-charts'
-import { getCompanies, getPriceHistory, getIndicators, getMacro } from '../api/data'
+import { getCompanies, getPriceHistory, getIndicators, getMacro, getEtfSummary } from '../api/data'
 import OrderBottomSheet from '../components/OrderBottomSheet'
 import MacroTicker from '../components/MacroTicker'
 import MacroSheet from '../components/MacroSheet'
@@ -103,6 +103,7 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
   const { simDate, holdings = [], portfolio } = state
   const [orderTab, setOrderTab] = useState(null) // 'BUY' | 'SELL' | null
   const [macroList, setMacroList] = useState([])
+  const [etfList,   setEtfList]   = useState([])
   const [macroOpen, setMacroOpen] = useState(false)
 
   const [companies, setCompanies] = useState([])
@@ -126,9 +127,26 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
   }
 
   // DOM refs
-  const mainDiv = useRef(null)
-  const rsiDiv  = useRef(null)
-  const macdDiv = useRef(null)
+  const mainDiv      = useRef(null)
+  const rsiDiv       = useRef(null)
+  const macdDiv      = useRef(null)
+  const companyRowRef = useRef(null)
+  const indRowRef     = useRef(null)
+  const dragState     = useRef({ dragging: false, startX: 0, scrollLeft: 0 })
+
+  const dragHandlers = (rowRef) => ({
+    onMouseDown: e => {
+      dragState.current = { dragging: true, startX: e.pageX, scrollLeft: rowRef.current.scrollLeft }
+      rowRef.current.style.cursor = 'grabbing'
+    },
+    onMouseMove: e => {
+      if (!dragState.current.dragging) return
+      e.preventDefault()
+      rowRef.current.scrollLeft = dragState.current.scrollLeft - (e.pageX - dragState.current.startX)
+    },
+    onMouseUp:    () => { dragState.current.dragging = false; if (rowRef.current) rowRef.current.style.cursor = '' },
+    onMouseLeave: () => { dragState.current.dragging = false; if (rowRef.current) rowRef.current.style.cursor = '' },
+  })
 
   // 차트 인스턴스
   const mainChart = useRef(null)
@@ -158,11 +176,12 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
     })
   }, [])
 
-  // 거시지표 로드
+  // 거시지표 + ETF 로드
   useEffect(() => {
     if (!startDate || !simDate) return
     const from = chartFrom(startDate)
     getMacro(from, simDate).then(r => setMacroList(r.data)).catch(() => {})
+    getEtfSummary(from, simDate).then(r => setEtfList(r.data)).catch(() => {})
   }, [simDate, startDate])
 
   // ── 메인 차트 초기화 ─────────────────────────────────────
@@ -363,10 +382,12 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
   return (
     <div style={s.root}>
       {/* 시장 지표 티커 */}
-      <MacroTicker macroList={macroList} onOpen={() => setMacroOpen(true)} />
+      <MacroTicker macroList={macroList} etfList={etfList} onOpen={() => setMacroOpen(true)} />
 
       {/* 기업 선택 */}
-      <div style={s.companyRow} className="hide-scrollbar">
+      <div ref={companyRowRef} style={s.companyRow} className="hide-scrollbar"
+        onWheel={e => { e.preventDefault(); companyRowRef.current.scrollLeft += e.deltaY }}
+        {...dragHandlers(companyRowRef)}>
         {(() => {
           const held = companies
             .filter(c => holdings.some(h => h.companyId === c.id))
@@ -387,7 +408,6 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
                   borderColor: isSel ? '#22c55e' : '#e5e7eb',
                   color:       isSel ? '#16a34a' : '#6b7280',
                 }}
-                onMouseDown={e => e.preventDefault()}
                 onClick={() => setSelected(c)}>
                 {getDisplayTicker(c.ticker, simDate)}
               </button>
@@ -404,7 +424,9 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
       </div>
 
       {/* 지표 토글 */}
-      <div style={s.indRow} className="hide-scrollbar">
+      <div ref={indRowRef} style={s.indRow} className="hide-scrollbar"
+        onWheel={e => { e.preventDefault(); indRowRef.current.scrollLeft += e.deltaY }}
+        {...dragHandlers(indRowRef)}>
         <button style={{ ...s.ind, borderColor: showVol ? '#64748b' : '#e5e7eb', color: showVol ? '#475569' : '#9ca3af' }} onMouseDown={e => e.preventDefault()} onClick={toggleVol}>거래량</button>
         {[5, 20, 60].map(p => (
           <button key={p} style={{ ...s.ind, borderColor: showMA[p] ? MA_COLORS[p] + 'bb' : '#e5e7eb', color: showMA[p] ? MA_COLORS[p] : '#9ca3af' }}
@@ -463,7 +485,7 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
 
       {/* 시장 지표 상세 시트 */}
       {macroOpen && (
-        <MacroSheet macroList={macroList} onClose={() => setMacroOpen(false)} />
+        <MacroSheet macroList={macroList} etfList={etfList} onClose={() => setMacroOpen(false)} />
       )}
 
       {/* 바텀시트 주문창 */}
@@ -487,7 +509,7 @@ const s = {
   root:       { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', gap: 6 },
   companyRow: { display: 'flex', flexWrap: 'nowrap', gap: 4, flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' },
   chip:       { background: '#fff', borderWidth: 1, borderStyle: 'solid', borderColor: '#e5e7eb', borderRadius: 6, padding: '4px 8px', color: '#9ca3af', fontSize: 11, fontWeight: 700, cursor: 'pointer', position: 'relative', outline: 'none', flexShrink: 0 },
-  chipActive: { borderColor: '#22c55e', color: '#16a34a' },
+  chipActive: { borderColor: '#f43f5e', color: '#16a34a' },
   chipHeld:   { borderColor: '#fcd34d', color: '#92400e' },
   dot:        { position: 'absolute', top: 2, right: 2, width: 4, height: 4, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' },
   indRow:     { display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' },
