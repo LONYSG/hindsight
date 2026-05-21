@@ -320,22 +320,49 @@ OTHER
   - 투자 성향 뱃지, 로딩 스피너
 - MDD 버그 수정: 날짜 점프 시 중간 거래일 스냅샷 모두 저장
 
+### 완료 (2026-05-21 추가)
+- GitHub Actions 뉴스 수집 자동화 (collect_news.yml)
+  - collection_state.json으로 진행 상태 추적 (next_month → 자동 커밋)
+  - Alpha Vantage 한도 최대 활용: 1회 실행 = 3달치 (M7 × 3개월 = 21 req/일)
+  - schedule + workflow_dispatch 이중 지원
+- GitHub Actions Oracle ARM 재시도 (oracle_retry.yml)
+  - 6h 주기, 350분 timeout, base64 인코딩 PEM 키
+  - 기존 RUNNING 인스턴스 있으면 자동 종료
+- FOMC/CPI/EARNINGS 캘린더 이벤트 수집 (calendar_collector.py)
+  - FOMC 40건, CPI 56건 (2020-2024), M7 실적발표 ~20분기/기업
+- daily_macro 거시지표 확장 (V4 마이그레이션, Supabase 적용)
+  - DXY(달러인덱스), VIX(공포지수), WTI(원유), Gold(금선물), BTC, US2Y 추가
+  - FRED + yfinance 조합 수집
+- 섹터 ETF 7개 추가 (SOXX/XLK/XLE/XLF/XLV/XLI/XLY)
+  - company 테이블 등록, daily_price 수집
+  - 거래 대상 제외 (지표로만 표시), /api/data/etf-summary 엔드포인트 신설
+- MacroTicker 컴포넌트 — CSS 무한 스크롤 띠
+  - `width: max-content` + `translateX(-50%)` 끊김 없는 루프
+  - hover/touch pause, isRate 구분 (금리: %p, 가격: %)
+- MacroSheet 컴포넌트 — 바텀시트 상세 보기
+  - 거시 지표 + 섹터 ETF 목록, 클릭 시 LineSeries 차트
+- 한국 MTS 색상 통일 (상승 빨강 #f43f5e, 하락 파랑 #3b82f6 전체 적용)
+- 종목 선택 칩 드래그/휠 스크롤 개선
+
 ### 진행 중
-- 뉴스 재처리 (re_summarize_all) — 131건 남음, 내일 이어서
+- Guardian/기업 뉴스 자동 수집 (GitHub Actions, 매일 3달치 진행 중 — 현재 2020-06~)
+- Oracle ARM 인스턴스 대기 중 (GitHub Actions 6h 주기 재시도)
 
 ### 미완료 / 다음 작업
-- Guardian 뉴스 수집 범위 확장 (2020년 3월~)
-- M7 기업 뉴스 수집 범위 확장 (2020년 3월~)
-- FOMC/CPI 캘린더 이벤트 수집 (market_event 테이블)
+- 뉴스 요약 재처리 (re_summarize_all) — 자동 수집분 요약 필요
+- Oracle 확보 후: Docker 환경 설정, Spring Boot Render → OCI 이전
 - 투자 성향 분석 고도화 (보유 기간, 손절/익절 패턴)
-- 전문가 비교 (버핏 등 하드코딩, 시작점별)
+- 전문가 비교 (버핏 등 하드코딩, 결과 화면 추가)
 - 인프라 (docker-compose 정리, GitHub Actions CI/CD)
 
 ---
 
 ## 데이터 수집 범위 결정 방침
 
-**현재: 2020년 2월 1개월치만 운영 중**
+**현재: 2020년 6월~부터 자동 수집 진행 중 (목표: 2021년 10월)**
+
+GitHub Actions `collect_news.yml`이 매일 09:05 KST에 3달치씩 수집 → 약 5~6주 내 코로나 에피소드 전체 완료 예정.
+Guardian 뉴스(거시) + Alpha Vantage(기업) 동시 수집.
 
 이유: 수집에 시간이 오래 걸리고 방향이 바뀔 수 있음.
 시스템을 몇 번 사용해보고 나서 범위 확장 여부 결정.
@@ -391,9 +418,9 @@ Guardian API / FRED
 Phase 1 - 데이터 파이프라인 ✅ 완료
   1. Python으로 yfinance 주가 수집 → PostgreSQL 저장 ✅
   2. 이벤트 감지 로직 (PRICE_SPIKE, VOLUME_SPIKE) ✅
-  3. Guardian API 뉴스 수집 → Gemini 선별 + 요약 → Elasticsearch ✅ (요약 진행 중)
-  4. FRED API 거시지표 수집 ✅
-  5. FOMC/CPI 캘린더 이벤트 수집 ← 미완료
+  3. Guardian API 뉴스 수집 → Gemini 선별 + 요약 → Elasticsearch ✅ (자동 수집 진행 중)
+  4. FRED API 거시지표 수집 ✅ (DXY/VIX/WTI/Gold/BTC/US2Y 추가 포함)
+  5. FOMC/CPI 캘린더 이벤트 수집 ✅ (2020-2024)
 
 Phase 2 - Spring Boot API + React ✅ 완료 (기본 플레이 가능)
   [Backend]
