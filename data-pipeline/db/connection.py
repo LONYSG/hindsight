@@ -16,7 +16,11 @@ def get_connection():
         dbname=settings.POSTGRES_DB,
         user=settings.POSTGRES_USER,
         password=settings.POSTGRES_PASSWORD,
-        prepare_threshold=None  # PgBouncer Transaction mode 호환
+        prepare_threshold=None,  # PgBouncer Transaction mode 호환
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=5,
     )
     try:
         yield conn
