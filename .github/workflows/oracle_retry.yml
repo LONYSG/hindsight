@@ -59,6 +59,9 @@ jobs:
               2>&1) || true
 
             CLEAN=$(echo "$RESULT" | grep -v FutureWarning | grep -v "warnings\." | grep -v strict)
+            echo "--- OCI 응답 ---"
+            echo "$CLEAN"
+            echo "----------------"
             CODE=$(echo "$CLEAN" | python3 -c "import json,sys,re; s=sys.stdin.read(); m=re.search(r'\"code\":\s*\"([^\"]+)\"',s); print(m.group(1) if m else '')" 2>/dev/null)
             MSG=$(echo "$CLEAN" | python3 -c "import json,sys,re; s=sys.stdin.read(); m=re.search(r'\"message\":\s*\"([^\"]+)\"',s); print(m.group(1) if m else '')" 2>/dev/null)
 
