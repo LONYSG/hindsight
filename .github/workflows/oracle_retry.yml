@@ -56,7 +56,7 @@ jobs:
               --assign-public-ip true \
               --display-name "hindsight-server" \
               --ssh-authorized-keys-file /tmp/hindsight_rsa.pub \
-              2>&1)
+              2>&1) || true
 
             CLEAN=$(echo "$RESULT" | grep -v FutureWarning | grep -v "warnings\." | grep -v strict)
             CODE=$(echo "$CLEAN" | python3 -c "import json,sys,re; s=sys.stdin.read(); m=re.search(r'\"code\":\s*\"([^\"]+)\"',s); print(m.group(1) if m else '')" 2>/dev/null)
