@@ -39,6 +39,18 @@ jobs:
           IMAGE="ocid1.image.oc1.ap-chuncheon-1.aaaaaaaan3ml5enlvv4uonyln7ppzfhs7msfzjbwl54gomazoezivbl36twa"
           SHAPE="VM.Standard.A1.Flex"
 
+          # 이미 인스턴스가 존재하면 종료
+          EXISTING=$(oci compute instance list \
+            --compartment-id "$TENANCY" \
+            --display-name "hindsight-server" \
+            --lifecycle-state RUNNING 2>&1) || true
+          if echo "$EXISTING" | grep -q '"lifecycle-state"'; then
+            echo "✅ 인스턴스 이미 실행 중. 종료합니다."
+            PUBLIC_IP=$(echo "$EXISTING" | python3 -c "import json,sys; d=json.load(sys.stdin); items=d.get('data',[]); print(items[0].get('public-ip','콘솔에서 확인') if items else '콘솔에서 확인')" 2>/dev/null || echo "OCI 콘솔에서 확인")
+            echo "Public IP: $PUBLIC_IP"
+            exit 0
+          fi
+
           ATTEMPT=0
           while true; do
             ATTEMPT=$((ATTEMPT + 1))
