@@ -15,6 +15,11 @@ on:
         description: 'Gemini 요약 실행 여부 (true/false)'
         required: true
         default: 'false'
+  schedule:
+    - cron: '5 0 * * *'
+
+permissions:
+  contents: write
 
 jobs:
   collect:
@@ -34,7 +39,36 @@ jobs:
       - name: 의존성 설치
         run: pip install -r data-pipeline/requirements.txt
 
+      - name: 날짜 설정
+        id: dates
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            NEXT_MONTH=$(python3 -c "import json; d=json.load(open('data-pipeline/collection_state.json')); print(d['next_month'])")
+            END_MONTH=$(python3 -c "import json; d=json.load(open('data-pipeline/collection_state.json')); print(d['end_month'])")
+
+            if [[ "$NEXT_MONTH" > "$END_MONTH" ]]; then
+              echo "skip=true" >> $GITHUB_OUTPUT
+              echo "전체 수집 완료. (next=$NEXT_MONTH > end=$END_MONTH)"
+              exit 0
+            fi
+
+            START_DATE="${NEXT_MONTH}-01"
+            END_DATE=$(date -d "${NEXT_MONTH}-01 +1 month -1 day" +%Y-%m-%d)
+            echo "start_date=${START_DATE}" >> $GITHUB_OUTPUT
+            echo "end_date=${END_DATE}" >> $GITHUB_OUTPUT
+            echo "summarize=false" >> $GITHUB_OUTPUT
+            echo "next_month=${NEXT_MONTH}" >> $GITHUB_OUTPUT
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "[스케줄] ${START_DATE} ~ ${END_DATE} 수집 시작"
+          else
+            echo "start_date=${{ inputs.start_date }}" >> $GITHUB_OUTPUT
+            echo "end_date=${{ inputs.end_date }}" >> $GITHUB_OUTPUT
+            echo "summarize=${{ inputs.summarize }}" >> $GITHUB_OUTPUT
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: 글로벌 뉴스 수집 (Guardian)
+        if: steps.dates.outputs.skip != 'true'
         working-directory: data-pipeline
         env:
           POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
@@ -48,11 +82,12 @@ jobs:
         run: |
           python -c "
           from collectors.news_collector import collect
-          collect('${{ inputs.start_date }}', '${{ inputs.end_date }}', summarize=False)
+          collect('${{ steps.dates.outputs.start_date }}', '${{ steps.dates.outputs.end_date }}', summarize=False)
           print('Guardian 수집 완료')
           "
 
       - name: 기업 뉴스 수집 (Alpha Vantage)
+        if: steps.dates.outputs.skip != 'true'
         working-directory: data-pipeline
         env:
           POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
@@ -66,12 +101,12 @@ jobs:
         run: |
           python -c "
           from collectors.company_news_collector import collect
-          collect(start_date='${{ inputs.start_date }}', end_date='${{ inputs.end_date }}')
+          collect(start_date='${{ steps.dates.outputs.start_date }}', end_date='${{ steps.dates.outputs.end_date }}')
           print('Alpha Vantage 수집 완료')
           "
 
       - name: Gemini 요약 실행
-        if: ${{ inputs.summarize == 'true' }}
+        if: steps.dates.outputs.skip != 'true' && steps.dates.outputs.summarize == 'true'
         working-directory: data-pipeline
         env:
           POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
@@ -88,3 +123,26 @@ jobs:
           re_summarize_all()
           print('Gemini 요약 완료')
           "
+
+      - name: 상태 업데이트 및 커밋 (스케줄 실행 시)
+        if: github.event_name == 'schedule' && steps.dates.outputs.skip != 'true'
+        run: |
+          python3 -c "
+          import json
+          with open('data-pipeline/collection_state.json') as f:
+              state = json.load(f)
+          year, month = map(int, state['next_month'].split('-'))
+          month += 1
+          if month > 12:
+              month = 1
+              year += 1
+          state['next_month'] = f'{year:04d}-{month:02d}'
+          with open('data-pipeline/collection_state.json', 'w') as f:
+              json.dump(state, f, indent=2, ensure_ascii=False)
+          print(f'다음 수집: {state[\"next_month\"]}')
+          "
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data-pipeline/collection_state.json
+          git commit -m "chore: 뉴스 수집 완료 (${{ steps.dates.outputs.next_month }}) [skip ci]"
+          git push
