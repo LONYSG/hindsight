@@ -30,6 +30,30 @@ jobs:
       - name: 의존성 설치
         run: pip install -r data-pipeline/requirements.txt
 
+      - name: DB 마이그레이션 (V4 - 신규 컬럼)
+        working-directory: data-pipeline
+        env:
+          POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GUARDIAN_API_KEY: ${{ secrets.GUARDIAN_API_KEY }}
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: |
+          python3 - << 'PYEOF'
+          import os, sys
+          sys.path.insert(0, '.')
+          from db.connection import get_connection
+          sql = open('../schema/V4__add_market_indicators.sql').read()
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute(sql)
+          print('마이그레이션 완료')
+          PYEOF
+
       - name: 거시지표 수집
         working-directory: data-pipeline
         env:
