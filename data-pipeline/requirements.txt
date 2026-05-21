@@ -17,7 +17,7 @@ elasticsearch==8.17.2
 python-dotenv==1.1.0
 
 # 데이터 처리
-pandas==2.2.3
+pandas>=2.3.2
 
 # 기술적 지표 계산 (RSI, MACD, 일목균형표)
 pandas-ta==0.4.71b0
