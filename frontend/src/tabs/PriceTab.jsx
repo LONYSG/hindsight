@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { createChart, CandlestickSeries, LineSeries, HistogramSeries } from 'lightweight-charts'
-import { getCompanies, getPriceHistory, getIndicators } from '../api/data'
+import { getCompanies, getPriceHistory, getIndicators, getMacro } from '../api/data'
 import OrderBottomSheet from '../components/OrderBottomSheet'
+import MacroTicker from '../components/MacroTicker'
+import MacroSheet from '../components/MacroSheet'
 import { getDisplayTicker, getDisplayCompany } from '../utils/companyDisplay'
 
 const fmt    = (n) => '$' + Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -100,6 +102,8 @@ function sortByMarketCap(companies, startDate) {
 export default function PriceTab({ state, startDate, sessionId, onTraded }) {
   const { simDate, holdings = [], portfolio } = state
   const [orderTab, setOrderTab] = useState(null) // 'BUY' | 'SELL' | null
+  const [macroList, setMacroList] = useState([])
+  const [macroOpen, setMacroOpen] = useState(false)
 
   const [companies, setCompanies] = useState([])
   const [selected, setSelected]   = useState(null)
@@ -153,6 +157,13 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
       setSelected(held || r.data[0] || null)
     })
   }, [])
+
+  // 거시지표 로드
+  useEffect(() => {
+    if (!startDate || !simDate) return
+    const from = chartFrom(startDate)
+    getMacro(from, simDate).then(r => setMacroList(r.data)).catch(() => {})
+  }, [simDate, startDate])
 
   // ── 메인 차트 초기화 ─────────────────────────────────────
   useEffect(() => {
@@ -351,6 +362,9 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
 
   return (
     <div style={s.root}>
+      {/* 시장 지표 티커 */}
+      <MacroTicker macroList={macroList} onOpen={() => setMacroOpen(true)} />
+
       {/* 기업 선택 */}
       <div style={s.companyRow} className="hide-scrollbar">
         {(() => {
@@ -445,6 +459,11 @@ export default function PriceTab({ state, startDate, sessionId, onTraded }) {
           <button style={s.buyBtn}  onClick={() => setOrderTab('BUY')}>매수</button>
           <button style={s.sellBtn} onClick={() => setOrderTab('SELL')}>매도</button>
         </div>
+      )}
+
+      {/* 시장 지표 상세 시트 */}
+      {macroOpen && (
+        <MacroSheet macroList={macroList} onClose={() => setMacroOpen(false)} />
       )}
 
       {/* 바텀시트 주문창 */}

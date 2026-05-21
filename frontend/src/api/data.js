@@ -10,3 +10,6 @@ export const getNews = (date, minImportance = 3) =>
 
 export const getIndicators = (companyId, from, to) =>
   client.get('/data/indicators', { params: { companyId, from, to } })
+
+export const getMacro = (from, to) =>
+  client.get('/data/macro', { params: { from, to } })

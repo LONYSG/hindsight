@@ -28,4 +28,16 @@ public class DailyMacro {
     private BigDecimal usdKrw;
     private BigDecimal sp500;
     private BigDecimal nasdaq;
+
+    private BigDecimal dxy;
+    private BigDecimal vix;
+
+    @Column(name = "wti_oil")
+    private BigDecimal wtiOil;
+
+    private BigDecimal gold;
+    private BigDecimal btc;
+
+    @Column(name = "us_2y_yield")
+    private BigDecimal us2yYield;
 }

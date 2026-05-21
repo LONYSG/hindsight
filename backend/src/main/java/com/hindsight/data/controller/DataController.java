@@ -2,11 +2,13 @@ package com.hindsight.data.controller;
 
 import com.hindsight.data.dto.CompanyResponse;
 import com.hindsight.data.dto.IndicatorResponse;
+import com.hindsight.data.dto.MacroResponse;
 import com.hindsight.data.dto.NewsResponse;
 import com.hindsight.data.dto.PriceHistoryResponse;
 import com.hindsight.data.dto.StartPointResponse;
 import com.hindsight.data.repository.CompanyRepository;
 import com.hindsight.data.repository.DailyIndicatorRepository;
+import com.hindsight.data.repository.DailyMacroRepository;
 import com.hindsight.data.repository.DailyPriceRepository;
 import com.hindsight.data.repository.StartPointRepository;
 import com.hindsight.data.service.NewsSearchService;
@@ -26,6 +28,7 @@ public class DataController {
     private final CompanyRepository companyRepository;
     private final DailyPriceRepository dailyPriceRepository;
     private final DailyIndicatorRepository dailyIndicatorRepository;
+    private final DailyMacroRepository dailyMacroRepository;
     private final NewsSearchService newsSearchService;
 
     @GetMapping("/start-points")
@@ -70,6 +73,17 @@ public class DataController {
                         i.getIchimokuTenkan(), i.getIchimokuKijun(),
                         i.getIchimokuSenkouA(), i.getIchimokuSenkouB()
                 ))
+                .toList();
+    }
+
+    @GetMapping("/macro")
+    public List<MacroResponse> getMacro(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return dailyMacroRepository.findByDateBetweenOrderByDateAsc(from, to)
+                .stream()
+                .map(MacroResponse::from)
                 .toList();
     }
 
