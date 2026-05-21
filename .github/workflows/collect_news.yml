@@ -52,10 +52,13 @@ jobs:
               exit 0
             fi
 
+            # 3달치 범위 계산 (end_month 초과 시 그 이전까지만)
+            BATCH_END=$(python3 -c "y,m=map(int,'$NEXT_MONTH'.split('-')); m+=2; y,m=(y+1,m-12) if m>12 else (y,m); be=f'{y:04d}-{m:02d}'; print(be if be<='$END_MONTH' else '$END_MONTH')")
             START_DATE="${NEXT_MONTH}-01"
-            END_DATE=$(date -d "${NEXT_MONTH}-01 +1 month -1 day" +%Y-%m-%d)
+            END_DATE=$(python3 -c "import calendar; y,m=map(int,'$BATCH_END'.split('-')); print(f'{y:04d}-{m:02d}-{calendar.monthrange(y,m)[1]:02d}')")
             echo "start_date=${START_DATE}" >> $GITHUB_OUTPUT
             echo "end_date=${END_DATE}" >> $GITHUB_OUTPUT
+            echo "batch_end_month=${BATCH_END}" >> $GITHUB_OUTPUT
             echo "summarize=false" >> $GITHUB_OUTPUT
             echo "next_month=${NEXT_MONTH}" >> $GITHUB_OUTPUT
             echo "skip=false" >> $GITHUB_OUTPUT
@@ -127,22 +130,9 @@ jobs:
       - name: 상태 업데이트 및 커밋 (스케줄 실행 시)
         if: github.event_name == 'schedule' && steps.dates.outputs.skip != 'true'
         run: |
-          python3 -c "
-          import json
-          with open('data-pipeline/collection_state.json') as f:
-              state = json.load(f)
-          year, month = map(int, state['next_month'].split('-'))
-          month += 1
-          if month > 12:
-              month = 1
-              year += 1
-          state['next_month'] = f'{year:04d}-{month:02d}'
-          with open('data-pipeline/collection_state.json', 'w') as f:
-              json.dump(state, f, indent=2, ensure_ascii=False)
-          print(f'다음 수집: {state[\"next_month\"]}')
-          "
+          python3 -c "import json; s=json.load(open('data-pipeline/collection_state.json')); y,m=map(int,'${{ steps.dates.outputs.batch_end_month }}'.split('-')); m+=1; y,m=(y+1,1) if m>12 else (y,m); s['next_month']=f'{y:04d}-{m:02d}'; json.dump(s,open('data-pipeline/collection_state.json','w'),indent=2); print('다음 수집: ' + s['next_month'])"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data-pipeline/collection_state.json
-          git commit -m "chore: 뉴스 수집 완료 (${{ steps.dates.outputs.next_month }}) [skip ci]"
+          git commit -m "chore: 뉴스 수집 완료 (${{ steps.dates.outputs.next_month }}~${{ steps.dates.outputs.batch_end_month }}) [skip ci]"
           git push
