@@ -21,9 +21,6 @@ jobs:
           mkdir -p ~/.oci
           echo "$OCI_PRIVATE_KEY" | base64 -d > ~/.oci/oci_api_key.pem
           chmod 600 ~/.oci/oci_api_key.pem
-          echo "키 첫 줄: $(head -1 ~/.oci/oci_api_key.pem)"
-          echo "키 라인 수: $(wc -l < ~/.oci/oci_api_key.pem)"
-          openssl rsa -in ~/.oci/oci_api_key.pem -check -noout 2>&1 || echo "openssl 검증 실패"
           {
             echo '[DEFAULT]'
             echo 'user=ocid1.user.oc1..aaaaaaaay442ktjd35xlnnbsbottvw723mnfapv3hlvk2aivbtc4yoqtd37a'
@@ -61,9 +58,6 @@ jobs:
               2>&1) || true
 
             CLEAN=$(echo "$RESULT" | grep -v FutureWarning | grep -v "warnings\." | grep -v strict)
-            echo "--- OCI 응답 ---"
-            echo "$CLEAN"
-            echo "----------------"
             CODE=$(echo "$CLEAN" | python3 -c "import json,sys,re; s=sys.stdin.read(); m=re.search(r'\"code\":\s*\"([^\"]+)\"',s); print(m.group(1) if m else '')" 2>/dev/null)
             MSG=$(echo "$CLEAN" | python3 -c "import json,sys,re; s=sys.stdin.read(); m=re.search(r'\"message\":\s*\"([^\"]+)\"',s); print(m.group(1) if m else '')" 2>/dev/null)
 
