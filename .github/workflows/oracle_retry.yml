@@ -21,6 +21,9 @@ jobs:
           mkdir -p ~/.oci
           printf '%s' "$OCI_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
           chmod 600 ~/.oci/oci_api_key.pem
+          echo "키 첫 줄: $(head -1 ~/.oci/oci_api_key.pem)"
+          echo "키 라인 수: $(wc -l < ~/.oci/oci_api_key.pem)"
+          openssl rsa -in ~/.oci/oci_api_key.pem -check -noout 2>&1 || echo "openssl 검증 실패"
           {
             echo '[DEFAULT]'
             echo 'user=ocid1.user.oc1..aaaaaaaay442ktjd35xlnnbsbottvw723mnfapv3hlvk2aivbtc4yoqtd37a'
