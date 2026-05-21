@@ -15,18 +15,23 @@ jobs:
         run: pip install oci-cli
 
       - name: OCI CLI 설정
+        env:
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.oci
-          echo "${{ secrets.OCI_PRIVATE_KEY }}" > ~/.oci/oci_api_key.pem
+          python3 -c "import os; open('/home/runner/.oci/oci_api_key.pem','w').write(os.environ['OCI_PRIVATE_KEY'])"
           chmod 600 ~/.oci/oci_api_key.pem
-          cat > ~/.oci/config << 'EOF'
-          [DEFAULT]
-          user=ocid1.user.oc1..aaaaaaaay442ktjd35xlnnbsbottvw723mnfapv3hlvk2aivbtc4yoqtd37a
-          fingerprint=4d:0c:6a:9d:73:65:f1:7b:34:4d:71:9d:21:ed:1c:56
-          tenancy=ocid1.tenancy.oc1..aaaaaaaadrdhymala26cqiimwt5srdjey7bmqdn6t76ljgv6oqt5c6lyfbsq
-          region=ap-chuncheon-1
-          key_file=/home/runner/.oci/oci_api_key.pem
-          EOF
+          python3 -c "
+          config = '''[DEFAULT]
+user=ocid1.user.oc1..aaaaaaaay442ktjd35xlnnbsbottvw723mnfapv3hlvk2aivbtc4yoqtd37a
+fingerprint=4d:0c:6a:9d:73:65:f1:7b:34:4d:71:9d:21:ed:1c:56
+tenancy=ocid1.tenancy.oc1..aaaaaaaadrdhymala26cqiimwt5srdjey7bmqdn6t76ljgv6oqt5c6lyfbsq
+region=ap-chuncheon-1
+key_file=/home/runner/.oci/oci_api_key.pem
+'''
+open('/home/runner/.oci/config','w').write(config)
+"
+          chmod 600 ~/.oci/config
 
           # SSH 공개키 저장
           cat > /tmp/hindsight_rsa.pub << 'EOF'
