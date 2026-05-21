@@ -4,6 +4,9 @@ requests==2.32.3
 # 거시지표 수집 (FRED API)
 fredapi==0.5.2
 
+# 주가/ETF/BTC 수집 (yfinance)
+yfinance>=0.2.50
+
 # AI 뉴스 요약 (Gemini API)
 google-generativeai==0.8.5
 
