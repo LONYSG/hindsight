@@ -172,8 +172,8 @@ def _fetch_alpha_vantage(ticker: str, start_date: str, end_date: str) -> list[di
     feed = data.get("feed", [])
     articles = []
     for item in feed:
-        title = item.get("title", "").strip()
-        body  = item.get("summary", "").strip()
+        title = (item.get("title") or "").strip()
+        body  = (item.get("summary") or "").strip()
         url   = item.get("url", "")
         if not title or not body:
             continue
