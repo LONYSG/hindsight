@@ -54,6 +54,8 @@ public class PlayService {
                 .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다."));
         var startPoint = startPointRepository.findById(request.startPointId())
                 .orElseThrow(() -> new ResourceNotFoundException("시작점을 찾을 수 없습니다."));
+        if (!startPoint.isAvailable())
+            throw new IllegalArgumentException("아직 준비 중인 시나리오입니다.");
 
         // 시작점 이후 첫 거래일 (NVDA 기준, M7 전체 공통 캘린더)
         LocalDate firstTradingDay = dailyPriceRepository

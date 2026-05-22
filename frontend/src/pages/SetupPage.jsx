@@ -148,8 +148,8 @@ export default function SetupPage() {
             const m = SCENARIO_META[sp.startDate] ?? {}
             return (
               <div key={sp.id}
-                style={{ ...s.scenarioCard, opacity: sp.available ? 1 : 0.55, cursor: sp.available ? 'pointer' : 'default' }}
-                onClick={() => sp.available && setModalSp(sp)}
+                style={{ ...s.scenarioCard, opacity: sp.available ? 1 : 0.75, cursor: 'pointer' }}
+                onClick={() => setModalSp(sp)}
               >
                 <div style={s.scenarioTop}>
                   <div style={s.scenarioLeft}>
@@ -228,11 +228,17 @@ export default function SetupPage() {
 
             {error && <p style={s.error}>{error}</p>}
 
-            <button
-              style={{ ...s.startBtn, background: meta.accent ?? '#16a34a' }}
-              onClick={handleStart} disabled={loading}>
-              {loading ? '시작 중...' : `${modalSp.name} 시작하기 →`}
-            </button>
+            {modalSp.available ? (
+              <button
+                style={{ ...s.startBtn, background: meta.accent ?? '#16a34a' }}
+                onClick={handleStart} disabled={loading}>
+                {loading ? '시작 중...' : `${modalSp.name} 시작하기 →`}
+              </button>
+            ) : (
+              <button style={{ ...s.startBtn, background: '#e5e7eb', color: '#9ca3af', cursor: 'not-allowed' }} disabled>
+                뉴스 데이터 준비 중입니다
+              </button>
+            )}
           </div>
         </div>
       )}
