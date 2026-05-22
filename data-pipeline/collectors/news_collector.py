@@ -297,10 +297,11 @@ def reset_news():
     print("[reset_news] news 테이블 초기화 완료")
 
 
-def re_summarize_all(batch_size: int = 50):
+def re_summarize_all(batch_size: int = 50, max_count: int = 0):
     """
     프롬프트 개선 후 전체 재요약.
     brief 필드가 없는 기사만 처리 → 중단 후 재실행해도 이어서 진행 가능.
+    max_count > 0 이면 해당 건수만 처리 후 종료 (일일 API 한도 제어용).
     """
     genai.configure(api_key=settings.GEMINI_API_KEY)
     model = genai.GenerativeModel(settings.GEMINI_MODEL)
@@ -308,10 +309,15 @@ def re_summarize_all(batch_size: int = 50):
     total = 0
     offset = 0
     while True:
+        if max_count > 0 and total >= max_count:
+            print(f"[re_summarize_all] max_count({max_count}) 도달. 중단.")
+            break
         articles = get_pending_summary(batch_size, offset)
         if not articles:
             break
         for a in articles:
+            if max_count > 0 and total >= max_count:
+                break
             r = _summarize(model, a)
             update_llm_fields(a["id"], r["title_ko"], r["brief"], r["summary"], r["themes"], r["llm_raw"])
             total += 1
