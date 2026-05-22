@@ -3,9 +3,9 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:postgres}
 
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/hindsight}
-    username: ${DATABASE_USERNAME:hindsight}
-    password: ${DATABASE_PASSWORD:hindsight}
+    url: ${DATABASE_URL:jdbc:postgresql://aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres}
+    username: ${DATABASE_USERNAME:postgres.dkrddfmvfxfnoodhyaoi}
+    password: ${DATABASE_PASSWORD:lonysg13579@!}
     driver-class-name: org.postgresql.Driver
 
   jpa:

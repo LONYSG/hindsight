@@ -2,33 +2,13 @@ version: '3.8'
 
 services:
 
-  # ==============================
-  # PostgreSQL - 주 데이터베이스
-  # ==============================
-  postgres:
-    image: postgres:15
-    container_name: hindsight-postgres
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-hindsight}
-      POSTGRES_USER: ${POSTGRES_USER:-hindsight}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hindsight}
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - hindsight-net
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hindsight}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # PostgreSQL → Supabase로 이전. 로컬 컨테이너 불필요.
+  # postgres:
+  #   image: postgres:15
+  #   ...
 
-# ==============================
-# 볼륨 - 컨테이너 재시작 후에도 데이터 유지
-# ==============================
-volumes:
-  postgres_data:
+# 볼륨 - postgres_data 제거 (Supabase 사용)
+volumes: {}
 
 # ==============================
 # 네트워크 - 컨테이너끼리 이름으로 통신
