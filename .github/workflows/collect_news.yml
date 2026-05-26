@@ -1,4 +1,4 @@
-name: 뉴스 수집
+name: 뉴스 수집 + 요약
 
 on:
   workflow_dispatch:
@@ -11,12 +11,8 @@ on:
         description: '수집 종료일 (예: 2020-03-31)'
         required: true
         default: '2020-03-31'
-      summarize:
-        description: 'Gemini 요약 실행 여부 (true/false)'
-        required: true
-        default: 'false'
   schedule:
-    - cron: '5 0 * * *'
+    - cron: '5 0 * * *'  # KST 09:05
 
 permissions:
   contents: write
@@ -24,7 +20,7 @@ permissions:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
 
     steps:
       - uses: actions/checkout@v4
@@ -52,21 +48,20 @@ jobs:
               exit 0
             fi
 
-            # 3달치 범위 계산 (end_month 초과 시 그 이전까지만)
-            BATCH_END=$(python3 -c "y,m=map(int,'$NEXT_MONTH'.split('-')); m+=2; y,m=(y+1,m-12) if m>12 else (y,m); be=f'{y:04d}-{m:02d}'; print(be if be<='$END_MONTH' else '$END_MONTH')")
+            # 1달치 범위 계산
             START_DATE="${NEXT_MONTH}-01"
-            END_DATE=$(python3 -c "import calendar; y,m=map(int,'$BATCH_END'.split('-')); print(f'{y:04d}-{m:02d}-{calendar.monthrange(y,m)[1]:02d}')")
+            END_DATE=$(python3 -c "import calendar; y,m=map(int,'$NEXT_MONTH'.split('-')); print(f'{y:04d}-{m:02d}-{calendar.monthrange(y,m)[1]:02d}')")
             echo "start_date=${START_DATE}" >> $GITHUB_OUTPUT
             echo "end_date=${END_DATE}" >> $GITHUB_OUTPUT
-            echo "batch_end_month=${BATCH_END}" >> $GITHUB_OUTPUT
-            echo "summarize=false" >> $GITHUB_OUTPUT
-            echo "next_month=${NEXT_MONTH}" >> $GITHUB_OUTPUT
+            echo "target_month=${NEXT_MONTH}" >> $GITHUB_OUTPUT
             echo "skip=false" >> $GITHUB_OUTPUT
-            echo "[스케줄] ${START_DATE} ~ ${END_DATE} 수집 시작"
+            echo "[스케줄] ${START_DATE} ~ ${END_DATE} 수집 + 요약 시작"
           else
+            # 수동 실행: start_date 기준 월 계산
+            TARGET_MONTH=$(python3 -c "print('${{ inputs.start_date }}'[:7])")
             echo "start_date=${{ inputs.start_date }}" >> $GITHUB_OUTPUT
             echo "end_date=${{ inputs.end_date }}" >> $GITHUB_OUTPUT
-            echo "summarize=${{ inputs.summarize }}" >> $GITHUB_OUTPUT
+            echo "target_month=${TARGET_MONTH}" >> $GITHUB_OUTPUT
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
@@ -108,8 +103,8 @@ jobs:
           print('Alpha Vantage 수집 완료')
           "
 
-      - name: Gemini 요약 실행
-        if: steps.dates.outputs.skip != 'true' && steps.dates.outputs.summarize == 'true'
+      - name: Gemini 요약 (해당 월)
+        if: steps.dates.outputs.skip != 'true'
         working-directory: data-pipeline
         env:
           POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
@@ -123,16 +118,29 @@ jobs:
         run: |
           python -c "
           from collectors.news_collector import re_summarize_all
-          re_summarize_all()
+          re_summarize_all(
+              date_from='${{ steps.dates.outputs.start_date }}',
+              date_to='${{ steps.dates.outputs.end_date }}',
+          )
           print('Gemini 요약 완료')
           "
 
       - name: 상태 업데이트 및 커밋 (스케줄 실행 시)
         if: github.event_name == 'schedule' && steps.dates.outputs.skip != 'true'
         run: |
-          python3 -c "import json; s=json.load(open('data-pipeline/collection_state.json')); y,m=map(int,'${{ steps.dates.outputs.batch_end_month }}'.split('-')); m+=1; y,m=(y+1,1) if m>12 else (y,m); s['next_month']=f'{y:04d}-{m:02d}'; json.dump(s,open('data-pipeline/collection_state.json','w'),indent=2); print('다음 수집: ' + s['next_month'])"
+          python3 -c "
+          import json
+          s = json.load(open('data-pipeline/collection_state.json'))
+          y, m = map(int, '${{ steps.dates.outputs.target_month }}'.split('-'))
+          m += 1
+          if m > 12:
+              y, m = y + 1, 1
+          s['next_month'] = f'{y:04d}-{m:02d}'
+          json.dump(s, open('data-pipeline/collection_state.json', 'w'), indent=2)
+          print('다음 수집:', s['next_month'])
+          "
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data-pipeline/collection_state.json
-          git commit -m "chore: 뉴스 수집 완료 (${{ steps.dates.outputs.next_month }}~${{ steps.dates.outputs.batch_end_month }}) [skip ci]"
+          git commit -m "chore: 뉴스 수집+요약 완료 (${{ steps.dates.outputs.target_month }}) [skip ci]"
           git push

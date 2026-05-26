@@ -88,21 +88,38 @@ def bulk_save(articles: list[dict]) -> int:
 
 # ─── 배치 재처리용 ─────────────────────────────────────────────
 
-def get_pending_summary(batch_size: int = 50, offset: int = 0) -> list[dict]:
-    """brief가 없는 기사 조회 (re_summarize_all용)"""
+def get_pending_summary(
+    batch_size: int = 50,
+    offset: int = 0,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> list[dict]:
+    """brief가 없는 기사 조회 (re_summarize_all용).
+    date_from/date_to 지정 시 해당 기간만 조회 (예: '2020-02-01' ~ '2020-02-29').
+    """
+    conditions = [
+        "body IS NOT NULL AND body != ''",
+        "(brief IS NULL OR brief = '')",
+    ]
+    params: list = []
+    if date_from:
+        conditions.append("date >= %s")
+        params.append(date_from)
+    if date_to:
+        conditions.append("date <= %s")
+        params.append(date_to)
+    params += [batch_size, offset]
+
+    sql = f"""
+        SELECT id, title, date, source, body
+        FROM news
+        WHERE {' AND '.join(conditions)}
+        ORDER BY date ASC
+        LIMIT %s OFFSET %s
+    """
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT id, title, date, source, body
-                FROM news
-                WHERE body IS NOT NULL AND body != ''
-                  AND (brief IS NULL OR brief = '')
-                ORDER BY date ASC
-                LIMIT %s OFFSET %s
-                """,
-                (batch_size, offset),
-            )
+            cur.execute(sql, params)
             rows = cur.fetchall()
     return [
         {"id": r[0], "title": r[1], "date": str(r[2]) if r[2] else "", "source": r[3], "body": r[4]}
