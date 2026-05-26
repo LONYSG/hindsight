@@ -8,7 +8,7 @@ on:
         required: true
         default: '1400'
   schedule:
-    - cron: '5 16 * * *'  # KST 01:05 (UTC 16:05 전날)
+    - cron: '5 23 * * *'  # KST 08:05 (UTC 23:05 전날) — collect_news(09:05) 이전 실행
 
 permissions:
   contents: read
