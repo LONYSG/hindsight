@@ -66,6 +66,7 @@ jobs:
           fi
 
       - name: 글로벌 뉴스 수집 (Guardian)
+        id: guardian
         if: steps.dates.outputs.skip != 'true'
         working-directory: data-pipeline
         env:
@@ -85,6 +86,7 @@ jobs:
           "
 
       - name: 기업 뉴스 수집 (Alpha Vantage)
+        id: alphavantage
         if: steps.dates.outputs.skip != 'true'
         working-directory: data-pipeline
         env:
@@ -104,6 +106,7 @@ jobs:
           "
 
       - name: Gemini 요약 (해당 월)
+        id: summarize
         if: steps.dates.outputs.skip != 'true'
         working-directory: data-pipeline
         env:
@@ -126,6 +129,7 @@ jobs:
           "
 
       - name: 상태 업데이트 및 커밋 (스케줄 실행 시)
+        id: state_update
         if: github.event_name == 'schedule' && steps.dates.outputs.skip != 'true'
         run: |
           python3 -c "
@@ -148,19 +152,45 @@ jobs:
       - name: 완료 알림 (ntfy)
         if: steps.dates.outputs.skip != 'true' && success()
         run: |
+          MONTH="${{ steps.dates.outputs.target_month }}"
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           curl -s \
-            -H "Title: ✅ 뉴스 수집+요약 완료" \
+            -H "Title: ✅ ${MONTH} 수집+요약 완료" \
             -H "Tags: white_check_mark,newspaper" \
             -H "Priority: default" \
-            -d "${{ steps.dates.outputs.target_month }} 수집+요약 완료" \
+            -H "Click: ${RUN_URL}" \
+            -d "${MONTH} Guardian + Alpha Vantage 수집, Gemini 요약 완료" \
             https://ntfy.sh/hindsight_lonysg
 
       - name: 실패 알림 (ntfy)
         if: steps.dates.outputs.skip != 'true' && failure()
         run: |
+          MONTH="${{ steps.dates.outputs.target_month }}"
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # 실패한 스텝 목록 구성
+          FAILED=""
+          if [ "${{ steps.guardian.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}• [Guardian 수집] API 한도 초과 or 네트워크 오류\n"
+          fi
+          if [ "${{ steps.alphavantage.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}• [Alpha Vantage] API 한도(25req/day) 초과 or 오류\n"
+          fi
+          if [ "${{ steps.summarize.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}• [Gemini 요약] API 한도(1500req/day) 초과 or 모델 오류\n"
+          fi
+          if [ "${{ steps.state_update.outcome }}" = "failure" ]; then
+            FAILED="${FAILED}• [상태 업데이트] git push 실패 (충돌 or 권한 오류)\n"
+          fi
+          # 어느 스텝인지 특정 안 된 경우
+          if [ -z "$FAILED" ]; then
+            FAILED="• 알 수 없는 오류 (로그 확인 필요)\n"
+          fi
+
           curl -s \
-            -H "Title: ❌ 뉴스 수집 실패" \
+            -H "Title: ❌ ${MONTH} 수집 실패" \
             -H "Tags: x,newspaper" \
             -H "Priority: high" \
-            -d "${{ steps.dates.outputs.target_month }} 수집 중 오류 발생 — GitHub Actions 확인 필요" \
+            -H "Click: ${RUN_URL}" \
+            -d "$(printf "${FAILED}\n로그: ${RUN_URL}")" \
             https://ntfy.sh/hindsight_lonysg
