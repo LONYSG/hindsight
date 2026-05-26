@@ -495,15 +495,14 @@ def _select_with_gemini(model, articles: list[dict], day: str) -> list[dict]:
                 selected.append(article)
 
         if not selected:
-            print(f"  [{day}] 선별 결과 없음 (fallback: 상위 3건, importance=2)")
-            fallback = [dict(a, importance=2) for a in articles[:3]]
-            return fallback
+            print(f"  [{day}] 선별 결과 없음 — 저장 스킵")
+            return []
 
         return selected
 
     except Exception as e:
-        print(f"  Gemini 선별 오류 ({day}): {e}")
-        return [dict(a, importance=2) for a in articles[:3]]
+        print(f"  Gemini 선별 오류 ({day}): {e} — 저장 스킵")
+        return []
 
 
 # ─── Gemini 요약 ──────────────────────────────────────────────
