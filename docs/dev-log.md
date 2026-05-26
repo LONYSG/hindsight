@@ -894,13 +894,195 @@ const dragHandlers = (ref) => ({
 
 ---
 
+---
+
+## 2026-05-22
+
+### 43. DB 단일화 — Elasticsearch 폐기, Supabase PostgreSQL 로 통합
+
+**한 것:**
+- 뉴스를 Elasticsearch 가 아닌 PostgreSQL `news` 테이블에 저장하도록 전환 (V3 마이그레이션 `add_news_table.sql`).
+- 백엔드: `NewsSearchService` 를 인터페이스로 분리하고 `PostgresNewsService` (@Profile("postgres")) 가 기본 활성.
+- 로컬 Docker DB 도 사용 중단 → `docker-compose.yml` 의 postgres 컨테이너 주석 처리 / 결국 empty placeholder 로 정리.
+- 일회성 마이그레이션 스크립트 `migrate_es_to_pg.py` 작성 → ES 의 hindsight-news 인덱스 데이터를 PG 로 옮기고 폐기.
+- 백엔드 `application.yml`, 데이터 파이프라인 `.env` 모두 Supabase Session Pooler 로 통일
+  (`aws-1-ap-northeast-2.pooler.supabase.com:5432`).
+
+**왜 이렇게 했나:**
+
+*ES 가 필요한가? 다시 묻기:*
+뉴스가 5천 건 수준이고 검색 패턴이 "날짜 범위 + importance 필터 + ticker 정렬" 정도다.
+PostgreSQL B-tree + GIN(tickers TEXT[]) 인덱스만으로 100ms 이하로 응답한다. 전문 검색 엔진은 과잉.
+
+*Docker 로컬 DB 도 안 쓰는 이유:*
+- 로컬 ↔ 운영 동기화 부담이 가장 큰 운영 비용
+- Supabase 무료 플랜으로 충분 (500MB)
+- 자동 백업, Connection Pooling, 외부 접근 모두 Supabase 가 제공
+- "다른 PC 에서도 같은 데이터" 가 즉시 보장됨
+
+*Connection Pooler (Session mode) 선택:*
+Transaction mode 는 PREPARE 캐시가 invalidate 되어 prepared statement 가 깨진다.
+psycopg3 의 `prepare_threshold=None` 옵션과 Session mode 조합으로 안전성 확보.
+
+**관련 PR:** main 직접 머지 (작업 우선)
+
+---
+
+## 2026-05-25 ~ 2026-05-26
+
+### 44. Gemini 한도 충돌 발견 → 워크플로우 통합
+
+**한 것:**
+- 기존 두 워크플로우 (`collect_news.yml` 매일 KST 09:05 / `summarize_news.yml` 매일 KST 01:05) 가 같은 Gemini 무료 키의 1,500 req/day 한도를 다투다 둘 다 깨지는 현상 발견.
+- `summarize_news.yml` 을 통째로 삭제하고, `collect_news.yml` 이 1달치 수집 → 같은 달 요약 → 상태 커밋 → ntfy 알림까지 일체 처리하도록 재설계.
+
+**근본 원인 분석:**
+
+```
+[기존 구조 — 깨짐]
+collect_news    KST 09:05 (UTC 00:05) — 3달치 수집, Guardian selection 에 Gemini ~90 호출
+summarize_news  KST 01:05 (UTC 16:05 전날) — 미요약 1,400건 요약
+
+→ 같은 UTC 일자(00:00~23:59) 안에서 두 워크플로우가 1500 한도 공유
+   summarize 가 1400 소진 → collect 의 Guardian selection 실패 → 429 폭발
+```
+
+**중간에 발견된 더 큰 문제 — fallback 결함:**
+
+`_select_with_gemini()` 의 except 처리가 다음과 같았다:
+```python
+except Exception as e:
+    print(f"Gemini 선별 오류 ({day}): {e}")
+    return [dict(a, importance=2) for a in articles[:3]]   # 상위 3건을 importance=2 로 저장
+```
+
+429 발생 시 헤드라인 선별 없이 그냥 상위 3건을 모두 importance=2 로 저장.
+거기에 `already_collected(day, 'BUSINESS')` 가 날짜 단위 중복 체크라 **다음 실행에서 재시도하지 않는다.**
+
+→ 이 fallback 때문에 2020-09 ~ 2021-08 약 1,000 건의 Guardian 뉴스가
+   **"importance=2, 본문 그대로, 선별 실패 흔적 없이" 영구 박혀버린 상태** 였다.
+
+DB 검증:
+```sql
+SELECT date, COUNT(*), AVG(importance)
+FROM news WHERE source_type IS NULL AND date BETWEEN '2020-09-01' AND '2021-08-31'
+GROUP BY date ORDER BY date;
+-- 거의 매일 3건 / importance=2 → 명백한 fallback 흔적
+```
+
+**수정:**
+```python
+except Exception as e:
+    print(f"Gemini 선별 오류 ({day}): {e} — 저장 스킵")
+    return []
+```
++ "선별 결과 없음" 분기도 [] 반환. **잘못된 데이터가 박히는 것보다 비는 게 100배 낫다.**
+
+**교훈 (LLM 사용 원칙에 추가):**
+"그래도 뭐라도 저장하자" 식 fallback 은 정규화 엔진 사용 원칙에 정면으로 위배된다.
+실패면 [] 반환 → 다음 실행에서 깨끗하게 재시도. 이 원칙을 CLAUDE.md 에 못박았다.
+
+---
+
+### 45. 수집+요약 워크플로우 통합 + 1달치 단위 전환
+
+**구조:**
+```
+매일 KST 09:05 (UTC 00:05)
+  ├── Guardian 1달치 수집 (selection 포함, Gemini ~30 호출)
+  ├── Alpha Vantage 1달치 수집 (M7 × 1달 = 7 req, 25/day 안에서 충분)
+  ├── Gemini 요약 (해당 월의 brief IS NULL 인 건만, ~350~660 호출)
+  ├── collection_state.json next_month++ → 자동 커밋 [skip ci]
+  └── ntfy 알림 (성공/실패, 실패 시 어느 스텝 죽었는지 명시)
+```
+
+**왜 1달치인가:**
+- 3달치는 Gemini selection ~90 호출 + 요약 ~1,500 호출 → 한도 99% 점유 (취약)
+- 1달치는 selection ~30 + 요약 ~350~660 → 한도 **25~45%** 만 사용 (여유)
+- 같은 워크플로우에서 수집 직후 요약하면 미요약 적체가 생기지 않음
+
+**`get_pending_summary`, `re_summarize_all` 에 `date_from/date_to` 파라미터 추가:**
+해당 월만 요약 처리하기 위해 SQL 조건을 동적으로 구성.
+```python
+def get_pending_summary(batch_size, offset, date_from=None, date_to=None):
+    conditions = ["body IS NOT NULL AND body != ''", "(brief IS NULL OR brief = '')"]
+    if date_from: conditions.append("date >= %s"); params.append(date_from)
+    if date_to:   conditions.append("date <= %s"); params.append(date_to)
+    ...
+```
+
+**기존 데이터 처리:**
+DB news 테이블 5,820건 모두 truncate. `collection_state.json` 을
+`{next_month: "2020-02", end_month: "2024-12"}` 로 초기화.
+59개월 × 매일 1달치 = 약 59일이면 코로나~AI 붐~2024 대선까지 전 기간 확보.
+
+---
+
+### 46. ntfy 알림 도입
+
+**한 것:**
+GitHub Actions 의 collect_news.yml 마지막에 ntfy 알림 스텝 추가. 채널 `hindsight_lonysg`.
+
+**왜 ntfy 인가:**
+- 별도 API 키 없이 `curl -d 'message' https://ntfy.sh/<channel>` 한 줄로 작동
+- 앱(iOS/Android)에서 채널명만 구독하면 푸시 알림 수신
+- Slack/Discord webhook 도 가능하지만 별도 워크스페이스/봇 셋업 필요 → 가장 마찰 적은 선택
+
+**구조:**
+```yaml
+- name: 완료 알림 (ntfy)
+  if: success()
+  run: |
+    curl -s -H "Title: ✅ {month} 수집+요약 완료" \
+            -H "Click: <Actions URL>" \
+            -d "..." https://ntfy.sh/hindsight_lonysg
+
+- name: 실패 알림 (ntfy)
+  if: failure()
+  run: |
+    # 각 step.outcome 확인해서 어느 스텝에서 죽었는지 명시
+    if [ "${{ steps.guardian.outcome }}" = "failure" ]; then
+      FAILED="${FAILED}• [Guardian 수집] API 한도 초과 or 네트워크 오류\n"
+    fi
+    # ... (alphavantage / summarize / state_update)
+    curl -s -H "Title: ❌ {month} 수집 실패" \
+            -H "Priority: high" \
+            -H "Click: <Actions URL>" \
+            -d "$FAILED" https://ntfy.sh/hindsight_lonysg
+```
+
+---
+
+### 47. 레거시 정리 (대청소)
+
+**삭제:**
+- `backend/src/main/java/com/hindsight/data/service/ElasticsearchNewsService.java` (@Profile("elasticsearch"), dead)
+- `data-pipeline/migrate_es_to_pg.py` (마이그레이션 1회 완료)
+- `k8s/` 디렉토리 (`.gitkeep` 만 있던 placeholder, K8s 도입 안 함)
+
+**갱신:**
+- `data-pipeline/config/settings.py`: ELASTICSEARCH_HOST/PORT, KAFKA_BOOTSTRAP_SERVERS, NYT_API_KEY, FINNHUB_API_KEY, GCP_PROJECT_ID 제거. POSTGRES_PASSWORD/USER 도 `os.environ[]` 으로 변경해 누락 시 즉시 실패.
+- `.env.example` (루트): backend/frontend 용으로 재작성, Supabase URL/USERNAME/PASSWORD 와 Kakao OAuth 만 포함.
+- `data-pipeline/.env.example`: 신규 생성, 실제 사용 7개 키만 포함.
+- `data-pipeline/main.py`: NYT 언급 제거, 워크플로우 분리 구조 명시. 실제 운영은 GitHub Actions 가 담당함을 명기.
+- `data-pipeline/collectors/news_collector.py`: docstring 갱신 — PostgreSQL 저장처/에러 처리 방식/fallback 금지 원칙 명시.
+- `docker-compose.yml`: empty placeholder (services/volumes/networks 모두 비움) + 의도 주석.
+- `README.md`: 완전 재작성. 이전엔 Kafka/ES/K8s/Redis/Claude API/ArgoCD/Prometheus 다 적혀있었음 — 전부 제거하고 실제 사용 스택만 기재.
+- `CLAUDE.md`: 전면 갱신. 새 세션에서 이 파일 하나만 읽어도 프로젝트 상태와 원칙을 정확히 파악 가능하도록.
+
+**왜 지금 정리했나:**
+세션이 길어지면서 Claude 가 "ES/Kafka 가 있다" 고 환각하는 일이 반복됐다.
+문서와 코드 양쪽에 잔재가 남아있으면 새 세션도 같은 환각을 반복할 수밖에 없다.
+다른 PC 에서 새 Claude 세션을 띄워도 즉시 정확한 컨텍스트를 잡도록 dead code/문서 잔재를 모두 잘라냈다.
+
+---
+
 ## 다음에 할 것
 
-- [ ] 뉴스 재처리 완료 (`re_summarize_all()`) — 2020년 6월~ 수집분
-- [ ] Guardian 뉴스 자동 수집 진행 중 (2020-06~, 매일 3달치 자동)
-- [ ] M7 기업 뉴스 자동 수집 진행 중 (Alpha Vantage, 매일 3달치)
-- [ ] Oracle ARM 인스턴스 대기 중 (GitHub Actions 6h 주기 재시도)
-- [ ] Oracle 확보 후: Docker 환경 설정, Spring Boot Render → OCI 이전
+- [ ] **뉴스 처음부터 재수집** (`collect_news.yml` 자동, 2020-02 ~ 2024-12, 59일 소요)
+- [ ] Oracle ARM 인스턴스 대기 (oracle_retry.yml 6h 주기)
+- [ ] **실제 EP1 end-to-end 플레이 테스트** (한 번도 안 했음 — 숨은 버그 색출)
+- [ ] Oracle 확보 후: Docker 환경 정리 + Spring Boot Render → OCI 이전
 - [ ] 투자 성향 분석 고도화 (보유 기간, 손절/익절 패턴)
-- [ ] 전문가 비교 (버핏 등 하드코딩, 결과 화면 추가)
-- [ ] 인프라 (docker-compose 정리, GitHub Actions CI/CD)
+- [ ] 전문가 포트폴리오 비교 (버핏 등 하드코딩 정성 요약)
+- [ ] EP2/EP3 데이터 준비 + 결제 게이팅 검토

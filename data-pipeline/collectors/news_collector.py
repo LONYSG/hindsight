@@ -1,14 +1,22 @@
 """
-뉴스 수집기 - The Guardian API
+글로벌 거시 뉴스 수집기 - The Guardian API + Gemini 선별
 
-하루씩 쿼리 → Gemini 선별 → 선별된 기사만 저장
-  Guardian BUSINESS    (business|money 섹션, 하루치 전체)
-  Guardian TECHNOLOGY  (technology 섹션, 하루치 전체)
-  Guardian WORLD       (world|us-news|politics 섹션, 하루치 전체)
-  → 전체 헤드라인을 Gemini에 전달 → 미국 투자자 관점 중요도 2점 이상만 선별
+흐름:
+  하루치 3개 섹션 전체 헤드라인 수집 → Gemini 가 relevance 1~5점 부여
+    BUSINESS    (business|money 섹션)
+    TECHNOLOGY  (technology 섹션)
+    WORLD       (world|us-news|politics 섹션)
+  → 점수 ≥ 2 인 기사만 PostgreSQL 의 news 테이블에 저장 (URL 기준 중복 제거)
 
-Guardian 500회/일 한도 도달 시 자동 중단 → 재실행 시 이어서 진행
-URL 기준 중복 제거
+저장처:
+  - PostgreSQL (Supabase) — Elasticsearch 사용 중단, 2026-05 단일 DB로 통합 완료
+
+오류 처리:
+  - Gemini 429 (quota) 또는 응답 파싱 실패 시: 해당 날짜 [] 반환 → 저장 스킵
+    fallback 저장은 절대 하지 않는다. 잘못된 데이터가 영구화되는 것을 막기 위함.
+  - Guardian 500회/일 한도 도달 시: RateLimitError 로 즉시 중단, 다음 실행에서 재개
+
+요약은 분리된 단계 (`re_summarize_all`) 에서 처리.
 """
 
 import json

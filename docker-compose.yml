@@ -1,18 +1,11 @@
-version: '3.8'
+# Hindsight - 로컬 인프라
+#
+# 현재 모든 데이터는 Supabase (PostgreSQL) 단일 DB로 통합 운영합니다.
+# 로컬 Docker DB는 사용하지 않으며, ES / Redis / Kafka 등도 도입하지 않습니다.
+#
+# 이 파일은 향후 모니터링(Prometheus/Grafana 등) 인프라 도입 시
+# 사용할 수 있는 placeholder 로만 유지합니다.
 
-services:
-
-  # PostgreSQL → Supabase로 이전. 로컬 컨테이너 불필요.
-  # postgres:
-  #   image: postgres:15
-  #   ...
-
-# 볼륨 - postgres_data 제거 (Supabase 사용)
+services: {}
 volumes: {}
-
-# ==============================
-# 네트워크 - 컨테이너끼리 이름으로 통신
-# ==============================
-networks:
-  hindsight-net:
-    driver: bridge
+networks: {}

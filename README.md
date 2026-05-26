@@ -2,69 +2,59 @@
 
 > "나스닥이 우상향인 걸 알면서도, 당신은 시장을 이길 수 있는가?"
 
-역사적 시점으로 돌아가 실제 뉴스와 주가 데이터를 보며 투자 판단을 내리고,  
-**시장 대비 내 수익률(알파)** 을 측정하는 주식 투자 시뮬레이터.
+역사적 시점으로 돌아가 그 시점의 실제 뉴스/주가/지표를 보며 매수·매도 판단을 내리고,
+**시장 대비 내 수익률(알파)** 과 **최대 낙폭(MDD)** 으로 자신의 투자 성향을 체험하는 시뮬레이터.
 
 ---
 
-## 프로젝트 소개
+## 프로젝트 본질
 
-유저는 특정 역사적 시점(예: 코로나 직전 2020년 2월)을 선택해 플레이를 시작합니다.  
-그 시점의 실제 주가, 거래량, 기술적 지표, 뉴스를 보며 매수/매도 판단을 내리고,  
-최종적으로 **내 수익률 vs 해당 주식 vs 나스닥 vs S&P500** 을 비교해 알파 점수를 산출합니다.
-
-### 핵심 지표: 알파(Alpha)
-
-단순 수익률이 아닌 **시장 대비 초과수익률** 이 이 서비스의 핵심입니다.
-
-```
-α = Rp - [Rf + β(Rm - Rf)]
-
-Rp: 유저 수익률
-Rm: 시장 수익률 (나스닥/S&P500)
-Rf: 무위험수익률 (미국 10년 국채)
-β:  포트폴리오 베타
-```
+단순한 "수익률 맞추기 게임"이 아니다.
+**"당시 불확실성 속에서 내가 어떤 투자자였는가"** 를 체험하는 시뮬레이션이다.
+결과보다 과정과 행동 패턴 분석이 핵심.
 
 ---
 
 ## 기술 스택
 
-| 영역 | 기술 |
-|------|------|
-| Backend | Spring Boot, Spring Security (JWT), Spring Batch |
-| Database | PostgreSQL, Redis, Elasticsearch |
-| Data Pipeline | Python, Kafka |
-| Frontend | React |
-| Infrastructure | Docker, Kubernetes, GitHub Actions, ArgoCD |
-| Monitoring | Prometheus, Grafana |
-| 외부 API | yfinance, FRED API, SEC EDGAR, NewsAPI, Claude API |
+| 영역 | 사용 기술 |
+|------|-----------|
+| Backend | Spring Boot 3.5, Spring Security (JWT), JPA |
+| Frontend | React + Vite, lightweight-charts v5, axios |
+| Database | **PostgreSQL (Supabase Session Pooler) 단일 DB** |
+| Data Pipeline | Python 3.12 + psycopg3 |
+| Auth | JWT + Kakao OAuth |
+| 외부 API | Tiingo (주가) · FRED + yfinance (거시) · The Guardian (뉴스) · Alpha Vantage (기업 뉴스) · Google Gemini (선별/요약) |
+| 자동화 | GitHub Actions (수집·요약·OCI 재시도) |
+| 알림 | ntfy (`hindsight_lonysg` 채널) |
+| 배포 | Render (백엔드, 임시) → Oracle Cloud Always Free ARM (예정) |
+
+**의도적으로 도입하지 않은 것**: Elasticsearch, Kafka, Kubernetes, Redis, Spring Batch, Prometheus/Grafana
+(이전 README/문서에 언급되어 있으나 MVP 단계에서는 PostgreSQL 단일 DB로 충분히 처리 가능하다고 판단해 제거)
 
 ---
 
 ## 아키텍처
 
 ```
-[데이터 수집 - Python]
-yfinance / FRED / NewsAPI
+[데이터 수집 - Python, GitHub Actions]
+Tiingo / FRED / yfinance / Guardian / Alpha Vantage
         ↓
-[Kafka]
+[Gemini API]
+  · Guardian 헤드라인 selection (relevance 1~5)
+  · title_ko / brief / summary / themes 생성
         ↓
-[Spring Batch]
-  → PostgreSQL (주가, 지표, 거시지표)
-  → Claude API 요약 → Elasticsearch (뉴스)
+[PostgreSQL (Supabase)]
+  · 주가, 지표, 거시지표, 캘린더 이벤트
+  · 뉴스 (news 테이블)
+  · 플레이 데이터 (세션, 매매, 스냅샷)
         ↓
 [Spring Boot API]
-  - JWT 인증
-  - 플레이 세션 관리
-  - 매수/매도 처리
-  - 수익률/알파 계산
+  · JWT + Kakao OAuth
+  · 플레이 세션 / 매수/매도 / 날짜 점프 / 결과 산출
         ↓
 [React Frontend]
-  - 주가 차트
-  - 뉴스 요약 카드
-  - 매수/매도 UI
-  - 결과 대시보드
+  · 캔들스틱 차트, 거시 지표 띠, 뉴스 카드, 매매 UI, 결과 리포트
 ```
 
 ---
@@ -73,43 +63,54 @@ yfinance / FRED / NewsAPI
 
 ```
 hindsight/
-├── backend/          # Spring Boot API 서버
-├── frontend/         # React 클라이언트
-├── data-pipeline/    # Python 데이터 수집 스크립트
-├── k8s/              # Kubernetes manifests
-└── docker-compose.yml
+├── backend/          Spring Boot API
+├── frontend/         React (Vite)
+├── data-pipeline/    Python 데이터 수집기 + Gemini 요약
+├── schema/           Flyway 마이그레이션 SQL (V1~V4)
+├── docs/dev-log.md   개발 일지
+├── CLAUDE.md         프로젝트 컨텍스트 + 작업 원칙
+└── .github/workflows/  자동화 워크플로우
 ```
 
 ---
 
-## 로컬 실행 방법
+## 로컬 실행
 
 ```bash
-# 인프라 실행 (PostgreSQL, Redis, Kafka, Elasticsearch)
-docker-compose up -d
+# 1) 환경 변수
+cp .env.example .env                              # backend / frontend 공용
+cp data-pipeline/.env.example data-pipeline/.env  # 데이터 파이프라인
 
-# 데이터 수집
-cd data-pipeline
-python collect.py
+# 2) Backend (Java 17 필요)
+cd backend && ./gradlew bootRun
 
-# Backend 실행
-cd backend
-./gradlew bootRun
+# 3) Frontend
+cd frontend && npm install && npm run dev
 
-# Frontend 실행
-cd frontend
-npm install && npm start
+# 4) 데이터 파이프라인 (수동 실행 예시)
+cd data-pipeline && source venv/bin/activate
+python -c "from collectors.news_collector import collect; collect('2020-02-01','2020-02-29', summarize=False)"
+python -c "from collectors.news_collector import re_summarize_all; re_summarize_all(date_from='2020-02-01', date_to='2020-02-29')"
 ```
-
-> 상세한 환경 설정은 각 디렉토리의 README를 참고하세요.
 
 ---
 
-## 개발 현황
+## 자동 수집 (GitHub Actions)
 
-| Phase | 내용 | 상태 |
-|-------|------|------|
-| Phase 1 | 데이터 파이프라인 | 🔲 진행 예정 |
-| Phase 2 | Spring Boot API + React | 🔲 진행 예정 |
-| Phase 3 | 인프라 (Docker, K8s, CI/CD) | 🔲 진행 예정 |
-| Phase 4 | 알파 고도화, 랭킹 시스템 | 🔲 진행 예정 |
+| 워크플로우 | 스케줄 | 내용 |
+|-----------|--------|------|
+| `collect_news.yml` | 매일 09:05 KST | 1달치 Guardian + Alpha Vantage 수집 → 해당 월 Gemini 요약 → 상태 커밋 → ntfy 알림 |
+| `collect_macro.yml` | 수동 | FRED + yfinance 거시지표 수집 |
+| `collect_etf.yml` | 수동 | 섹터 ETF 7개 가격 수집 |
+| `collect_calendar.yml` | 수동 | FOMC / CPI / EARNINGS 캘린더 적재 |
+| `oracle_retry.yml` | 6h 주기 | OCI Always Free ARM 인스턴스 생성 재시도 |
+
+진행 상태는 `data-pipeline/collection_state.json` 에 `{next_month, end_month}` 로 저장되며,
+워크플로우가 매 실행마다 `next_month` 를 한 달 앞으로 밀고 자동 커밋한다.
+
+---
+
+## 자세한 컨텍스트
+
+- **개발 일지** : `docs/dev-log.md` — 의사결정 히스토리 (왜 이렇게 됐나)
+- **현재 상태 + 원칙** : `CLAUDE.md` — 새 세션에서 시작할 때 반드시 읽기
