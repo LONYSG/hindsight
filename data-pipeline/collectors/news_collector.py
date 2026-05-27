@@ -321,12 +321,13 @@ def re_summarize_all(
     model = genai.GenerativeModel(settings.GEMINI_MODEL)
 
     total = 0
-    offset = 0
     while True:
         if max_count > 0 and total >= max_count:
             print(f"[re_summarize_all] max_count({max_count}) 도달. 중단.")
             break
-        articles = get_pending_summary(batch_size, offset, date_from=date_from, date_to=date_to)
+        # offset은 항상 0: 처리 완료된 항목은 brief가 채워져 다음 쿼리 결과셋에서 제외됨.
+        # offset을 증가시키면 이미 줄어든 결과셋에 OFFSET이 중첩 적용되어 기사가 스킵됨.
+        articles = get_pending_summary(batch_size, 0, date_from=date_from, date_to=date_to)
         if not articles:
             break
         for a in articles:
@@ -336,7 +337,6 @@ def re_summarize_all(
             update_llm_fields(a["id"], r["title_ko"], r["brief"], r["summary"], r["themes"], r["llm_raw"])
             total += 1
             time.sleep(_GEMINI_FREE_TIER_SLEEP)
-        offset += batch_size
         print(f"[re_summarize_all] {total}건 완료...")
 
     print(f"[re_summarize_all] 전체 완료. 총 {total}건")
