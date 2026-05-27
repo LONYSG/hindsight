@@ -11,11 +11,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ─── 외부 API ─────────────────────────────────────────────────
-# Tiingo (주가, 무료, adjusted 가격, 전체 기간 제공)
-TIINGO_API_KEY        = os.environ["TIINGO_API_KEY"]
+# Tiingo (주가, 무료, adjusted 가격, 전체 기간 제공) — price_collector 전용
+TIINGO_API_KEY        = os.getenv("TIINGO_API_KEY", "")
 
-# FRED (거시지표 - 기준금리/국채/달러인덱스/VIX/WTI 등)
-FRED_API_KEY          = os.environ["FRED_API_KEY"]
+# FRED (거시지표 - 기준금리/국채/달러인덱스/VIX/WTI 등) — macro_collector 전용
+FRED_API_KEY          = os.getenv("FRED_API_KEY", "")
 
 # The Guardian (글로벌 거시 뉴스)
 GUARDIAN_API_KEY      = os.environ["GUARDIAN_API_KEY"]
